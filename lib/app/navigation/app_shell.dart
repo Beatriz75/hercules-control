@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hercules_control/app/navigation/app_route.dart';
 import 'package:hercules_control/app/navigation/app_section.dart';
 import 'package:hercules_control/features/audits/presentation/audits_page.dart';
 import 'package:hercules_control/features/candidates/presentation/candidates_page.dart';
@@ -105,15 +106,15 @@ class _AppShellState extends State<AppShell> {
                     child: ListView(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       children: [
-                        for (final item in _sectionItems)
+                        for (final route in appRoutes)
                           _SidebarTile(
                             collapsed: _collapsed,
-                            selected: _active == item.section,
-                            icon: item.icon,
-                            label: item.label,
+                            selected: _active == route.section,
+                            icon: _iconForSection(route.section),
+                            label: route.label,
                             onTap: () {
                               setState(() {
-                                _active = item.section;
+                                _active = route.section;
                               });
                             },
                           ),
@@ -206,29 +207,15 @@ class _SidebarTile extends StatelessWidget {
   }
 }
 
-class _SectionItem {
-  const _SectionItem(this.section, this.label, this.icon);
-
-  final AppSection section;
-  final String label;
-  final IconData icon;
+IconData _iconForSection(AppSection section) {
+  return switch (section) {
+    AppSection.dashboard => Icons.space_dashboard_rounded,
+    AppSection.employees => Icons.groups_rounded,
+    AppSection.candidates => Icons.badge_rounded,
+    AppSection.audits => Icons.fact_check_rounded,
+    AppSection.performance => Icons.trending_up_rounded,
+    AppSection.reports => Icons.report_problem_rounded,
+    AppSection.lines => Icons.sim_card_rounded,
+    AppSection.settings => Icons.settings_rounded,
+  };
 }
-
-const _sectionItems = [
-  _SectionItem(
-    AppSection.dashboard,
-    'Dashboard',
-    Icons.space_dashboard_rounded,
-  ),
-  _SectionItem(AppSection.employees, 'Empleados', Icons.groups_rounded),
-  _SectionItem(AppSection.candidates, 'Candidatos', Icons.badge_rounded),
-  _SectionItem(AppSection.audits, 'Auditorías', Icons.fact_check_rounded),
-  _SectionItem(
-    AppSection.performance,
-    'Rendimiento',
-    Icons.trending_up_rounded,
-  ),
-  _SectionItem(AppSection.reports, 'Reportes', Icons.report_problem_rounded),
-  _SectionItem(AppSection.lines, 'Líneas WhatsApp', Icons.sim_card_rounded),
-  _SectionItem(AppSection.settings, 'Configuración', Icons.settings_rounded),
-];
