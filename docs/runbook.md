@@ -1,34 +1,37 @@
-# Guia de ejecucion web planificada
+# Guia de ejecucion web
 
 ## Estado
 
-Este documento describe la ejecucion esperada para la etapa web planificada. La implementacion actual sigue siendo un MVP Flutter desktop local.
+Este documento describe la ejecucion local de la etapa web. La API base FastAPI ya puede levantarse con Docker Compose; la persistencia sigue planificada para una issue posterior.
 
 ## Stack objetivo
 
 - Frontend: Flutter Web y Dart.
 - Backend: FastAPI y Python.
-- Base de datos: PostgreSQL.
-- Migraciones: Alembic.
+- Base de datos: PostgreSQL pendiente.
+- Migraciones: Alembic pendiente.
 - Infraestructura: Docker y Docker Compose.
 - Produccion: servidor con HTTPS.
 
-## Desarrollo local esperado
+## Desarrollo local
 
-Comando objetivo pendiente de implementacion:
+Levantar la API base:
 
 ```powershell
 docker compose up --build
 ```
 
-Servicios esperados:
+Servicios actuales:
 
-- frontend web;
-- backend API;
-- PostgreSQL;
-- migraciones Alembic.
+- backend API en `http://localhost:8000`.
 
-## Variables de entorno esperadas
+Healthcheck:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/health
+```
+
+## Variables de entorno planificadas
 
 - `DATABASE_URL`
 - `SECRET_KEY`
@@ -48,8 +51,9 @@ flutter test
 Backend:
 
 ```powershell
+cd backend
+pip install -r requirements-dev.txt
 pytest
-alembic upgrade head
 ```
 
 Infraestructura:
