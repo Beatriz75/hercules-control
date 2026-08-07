@@ -20,14 +20,21 @@ EXCLUDED_BUSINESS_TABLE_TERMS = (
 def test_initial_migration_creates_only_bootstrap_table() -> None:
     migration_files = sorted(MIGRATIONS_DIR.glob("*.py"))
 
-    assert [migration.name for migration in migration_files] == [
-        "20260806_0001_create_schema_migrations_bootstrap.py"
-    ]
+    initial_migration = MIGRATIONS_DIR / "20260806_0001_create_schema_migrations_bootstrap.py"
+    assert initial_migration in migration_files
 
-    migration_text = migration_files[0].read_text(encoding="utf-8")
+    migration_text = initial_migration.read_text(encoding="utf-8")
 
     assert 'op.create_table(\n        "schema_migrations_bootstrap"' in migration_text
     assert migration_text.count("op.create_table(") == 1
+
+
+def test_audit_template_migration_creates_allowed_tables() -> None:
+    migration = MIGRATIONS_DIR / "20260806_0002_create_audit_templates.py"
+    migration_text = migration.read_text(encoding="utf-8")
+
+    assert 'op.create_table(\n        "audit_templates"' in migration_text
+    assert 'op.create_table(\n        "audit_template_criteria"' in migration_text
 
 
 def test_initial_migration_does_not_create_business_tables() -> None:
