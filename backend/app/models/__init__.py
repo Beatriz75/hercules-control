@@ -8,7 +8,14 @@ from app.models.course import (
     TrainingQuestionOption,
 )
 from app.models.operational_audit import OperationalAudit, OperationalAuditAnswer, OperationalAuditFinding
-from app.models.training_attempt import LessonProgress, TrainingAnswer, TrainingAnswerOption, TrainingAttempt
+from app.models.training_attempt import (
+    LessonProgress,
+    PracticeSession,
+    TrainingAnswer,
+    TrainingAnswerOption,
+    TrainingAttempt,
+)
+from app.models.user import User
 
 __all__ = [
     "AuditTemplate",
@@ -21,9 +28,11 @@ __all__ = [
     "OperationalAudit",
     "OperationalAuditAnswer",
     "OperationalAuditFinding",
+    "PracticeSession",
     "TrainingAnswer",
     "TrainingAnswerOption",
     "TrainingAttempt",
     "TrainingQuestion",
     "TrainingQuestionOption",
+    "User",
 ]

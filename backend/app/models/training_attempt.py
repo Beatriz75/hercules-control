@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -80,3 +80,20 @@ class LessonProgress(Base):
     )
 
     lesson: Mapped[CourseLesson] = relationship()
+
+
+class PracticeSession(Base):
+    """The random questions drawn for one practice; the attempt must answer exactly these."""
+
+    __tablename__ = "practice_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    employee_reference: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    lesson_id: Mapped[int] = mapped_column(
+        ForeignKey("course_lessons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_ids: Mapped[list[int]] = mapped_column(JSON(), nullable=False)
+    attempt_id: Mapped[int | None] = mapped_column(
+        ForeignKey("training_attempts.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -53,6 +53,8 @@ class CourseLesson(Base):
     summary: Mapped[str] = mapped_column(Text(), nullable=False)
     theory: Mapped[str] = mapped_column(Text(), nullable=False)
     required_approval_percent: Mapped[int] = mapped_column(Integer, nullable=False, server_default="80")
+    # How many questions of the lesson's bank each practice draws at random; None = all of them.
+    questions_per_attempt: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean(), nullable=False, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

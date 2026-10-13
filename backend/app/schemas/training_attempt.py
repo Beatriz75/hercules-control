@@ -10,25 +10,20 @@ class TrainingAnswerCreate(BaseModel):
     @model_validator(mode="after")
     def validate_unique_selected_options(self) -> "TrainingAnswerCreate":
         if len(self.selected_option_ids) != len(set(self.selected_option_ids)):
-            raise ValueError("selected_option_ids values must be unique")
+            raise ValueError("Elegiste la misma opción dos veces.")
         return self
 
 
 class TrainingAttemptCreate(BaseModel):
-    employee_reference: str = Field(min_length=1, max_length=120)
-    lesson_id: int
+    session_id: int
     answers: list[TrainingAnswerCreate] = Field(min_length=1)
 
     @model_validator(mode="after")
     def validate_unique_questions(self) -> "TrainingAttemptCreate":
         question_ids = [answer.question_id for answer in self.answers]
         if len(question_ids) != len(set(question_ids)):
-            raise ValueError("answer question_id values must be unique")
+            raise ValueError("Respondiste la misma pregunta dos veces.")
         return self
-
-
-class TheoryCompletedUpdate(BaseModel):
-    employee_reference: str = Field(min_length=1, max_length=120)
 
 
 class TrainingAnswerOptionRead(BaseModel):

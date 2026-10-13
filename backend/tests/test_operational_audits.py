@@ -1,35 +1,4 @@
-from collections.abc import Generator
-
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
-
-from app.db.base import Base
-from app.db.session import get_db
-from app.main import create_app
-import app.models  # noqa: F401
-
-
-@pytest.fixture()
-def client() -> Generator[TestClient, None, None]:
-    engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(bind=engine)
-
-    def override_get_db() -> Generator[Session, None, None]:
-        with Session(engine) as session:
-            yield session
-
-    app = create_app()
-    app.dependency_overrides[get_db] = override_get_db
-
-    with TestClient(app) as test_client:
-        yield test_client
 
 
 def _create_template(client: TestClient, is_active: bool = True) -> dict:
@@ -106,7 +75,7 @@ def test_rejects_inactive_template(client: TestClient) -> None:
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Audit template is inactive"
+    assert response.json()["detail"] == "La plantilla de auditoría está inactiva."
 
 
 def test_rejects_answer_criterion_not_in_template(client: TestClient) -> None:
@@ -127,7 +96,7 @@ def test_rejects_answer_criterion_not_in_template(client: TestClient) -> None:
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Answers must reference criteria from the selected template"
+    assert response.json()["detail"] == "Las respuestas deben corresponder a criterios de la plantilla elegida."
 
 
 def test_get_operational_audit(client: TestClient) -> None:

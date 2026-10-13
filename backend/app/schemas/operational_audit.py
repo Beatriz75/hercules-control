@@ -13,7 +13,7 @@ class OperationalAuditAnswerCreate(BaseModel):
     @model_validator(mode="after")
     def validate_answer_content(self) -> "OperationalAuditAnswerCreate":
         if self.answer_text is None and self.answer_score is None:
-            raise ValueError("answer_text or answer_score is required")
+            raise ValueError("Cada respuesta necesita texto o puntaje.")
         return self
 
 
@@ -31,7 +31,7 @@ class OperationalAuditCreate(BaseModel):
     def validate_unique_answers(self) -> "OperationalAuditCreate":
         criterion_ids = [answer.criterion_id for answer in self.answers]
         if len(criterion_ids) != len(set(criterion_ids)):
-            raise ValueError("answer criterion_id values must be unique")
+            raise ValueError("Hay un criterio respondido dos veces.")
         return self
 
 
