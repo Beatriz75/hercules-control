@@ -123,3 +123,32 @@ def test_edit_question_validation_in_spanish(client: TestClient) -> None:
     assert response.status_code == 422
     assert "exactamente una opción correcta" in response.json()["detail"][0]["msg"]
     assert client.put("/questions/9999", json={"prompt": "x", "options": [{"label": "A", "is_correct": True, "sort_order": 1}, {"label": "B", "sort_order": 2}]}).status_code == 404
+
+
+def test_add_question_from_bank_goes_to_the_end_of_the_lesson(client: TestClient) -> None:
+    course = _course(client, "Cobranza", ["Ofertas"], ["P1", "P2"])
+    lesson = course["lessons"][0]
+    body = {
+        "lesson_id": lesson["id"],
+        "prompt": "P3 nueva",
+        "answer_mode": "multiple",
+        "options": [
+            {"label": "A", "is_correct": True, "sort_order": 1},
+            {"label": "B", "is_correct": True, "sort_order": 2},
+            {"label": "C", "sort_order": 3},
+        ],
+    }
+    created = client.post("/questions", json=body)
+    assert created.status_code == 201
+    row = created.json()
+    assert row["lesson_id"] == lesson["id"] and row["sort_order"] == 3
+    assert [r["prompt"] for r in client.get("/questions").json()] == ["P1", "P2", "P3 nueva"]
+
+    client.act_as(Role.ALUMNO, "cobrador1", "Ofertas")
+    assert client.get("/courses/assigned").json()[0]["lessons"][0]["question_bank_size"] == 3
+
+    client.act_as(Role.SUPERVISOR, "sup")
+    assert client.post("/questions", json=body).status_code == 403
+    client.act_as(Role.ADMINISTRADOR, "admin")
+    assert client.post("/questions", json=body | {"lesson_id": 9999}).status_code == 404
+    assert client.post("/questions", json=body | {"prompt": ""}).status_code == 422

@@ -20,6 +20,36 @@ http.Response _json(Object body, [int status = 200]) => http.Response(
 );
 
 final _puts = <String, Map<String, dynamic>>{};
+final _posts = <Map<String, dynamic>>[];
+var _courses = <Map<String, dynamic>>[];
+
+Map<String, dynamic> _courseJson() => {
+  'id': 1,
+  'title': 'Ruta Ofertas',
+  'description': null,
+  'status': 'active',
+  'sort_order': 1,
+  'active': true,
+  'stores': [
+    {'id': 1, 'store_code': 'Ofertas'},
+  ],
+  'lessons': [
+    for (final lesson in [(9, 'Intro', 1), (10, 'Transferencias', 2)])
+      {
+        'id': lesson.$1,
+        'course_id': 1,
+        'title': lesson.$2,
+        'summary': 'S',
+        'theory': 'T',
+        'required_approval_percent': 80,
+        'questions_per_attempt': null,
+        'sort_order': lesson.$3,
+        'active': true,
+        'theory_images': [],
+        'questions': [],
+      },
+  ],
+};
 
 Future<AuthController> _signIn(
   WidgetTester tester,
@@ -41,6 +71,18 @@ Future<AuthController> _signIn(
         'permissions': permissions,
       });
     }
+    if (request.method == 'POST' && path.endsWith('/questions')) {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      _posts.add(body);
+      return _json(
+        bankRowJson(
+          id: 500 + _posts.length,
+          prompt: body['prompt'] as String,
+          lessonId: body['lesson_id'] as int,
+        ),
+        201,
+      );
+    }
     if (request.method == 'PUT' && path.contains('/questions/')) {
       final body = jsonDecode(request.body) as Map<String, dynamic>;
       _puts[path] = body;
@@ -57,7 +99,7 @@ Future<AuthController> _signIn(
         ),
       ]);
     }
-    if (path.endsWith('/courses')) return _json([]);
+    if (path.endsWith('/courses')) return _json(_courses);
     if (path.endsWith('/courses/progress')) return _json([]);
     return _json({'detail': 'No encontrado.'}, 404);
   });
@@ -92,7 +134,11 @@ Future<void> _openBank(WidgetTester tester, AuthController auth) async {
 }
 
 void main() {
-  setUp(_puts.clear);
+  setUp(() {
+    _puts.clear();
+    _posts.clear();
+    _courses = [_courseJson()];
+  });
 
   testWidgets('supervisor sees the bank read-only with correct answers', (
     tester,
@@ -112,6 +158,7 @@ void main() {
     expect(find.text('Inactivo'), findsOneWidget);
     expect(find.text('Pago en OXXO'), findsOneWidget);
     expect(find.text('Editar'), findsNothing);
+    expect(find.text('Nueva pregunta'), findsNothing);
     expect(find.byIcon(Icons.check_circle_rounded), findsNWidgets(2));
 
     await tester.enterText(
@@ -209,5 +256,91 @@ void main() {
     await _settle(tester);
     expect(find.text('Catálogo de cursos'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'admin creates questions and "Guardar y agregar otra" keeps the lesson',
+    (tester) async {
+      final auth = await _signIn(tester, 'administrador', [
+        'courses.view',
+        'courses.manage',
+      ]);
+      await _openBank(tester, auth);
+
+      await tester.tap(find.text('Nueva pregunta'));
+      await _settle(tester);
+      expect(find.text('Guardar y agregar otra'), findsOneWidget);
+
+      // Lesson is required.
+      await tester.tap(find.text('Guardar pregunta'));
+      await _settle(tester);
+      expect(find.text('Elige el curso y la lección.'), findsWidgets);
+      expect(_posts, isEmpty);
+
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<int>, 'Curso'),
+      );
+      await _settle(tester);
+      await tester.tap(find.text('Ruta Ofertas').last);
+      await _settle(tester);
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<int>, 'Lección'),
+      );
+      await _settle(tester);
+      await tester.tap(find.text('Lección 2: Transferencias').last);
+      await _settle(tester);
+
+      final fields = find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(TextFormField),
+      );
+      await tester.enterText(fields.at(0), 'Pregunta nueva');
+      await tester.enterText(fields.at(1), 'Sí');
+      await tester.enterText(fields.at(2), 'No');
+      await tester.pump();
+      await tester.tap(find.text('Guardar y agregar otra'));
+      await _settle(tester);
+
+      expect(_posts, hasLength(1));
+      expect(_posts.single['lesson_id'], 10);
+      expect(_posts.single['prompt'], 'Pregunta nueva');
+      expect(
+        (_posts.single['options'] as List).map((option) => option['label']),
+        ['Sí', 'No'],
+      );
+      expect(
+        find.text('Pregunta agregada al banco de «Lección 2: Transferencias»'),
+        findsOneWidget,
+      );
+
+      // Dialog stays open with the same lesson and an empty question.
+      expect(find.text('Nueva pregunta'), findsWidgets);
+      expect(find.text('Lección 2: Transferencias'), findsOneWidget);
+      expect(tester.widget<TextFormField>(fields.at(0)).initialValue, '');
+
+      await tester.tap(find.text('Cancelar').last);
+      await _settle(tester);
+      expect(find.text('Guardar y agregar otra'), findsNothing);
+      expect(find.text('3 preguntas'), findsOneWidget);
+      expect(find.text('Pregunta nueva'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('without courses the button explains what to do', (tester) async {
+    _courses = [];
+    final auth = await _signIn(tester, 'administrador', [
+      'courses.view',
+      'courses.manage',
+    ]);
+    await _openBank(tester, auth);
+
+    await tester.tap(find.text('Nueva pregunta'));
+    await _settle(tester);
+    expect(
+      find.text('Primero crea un curso con al menos una lección en Cursos.'),
+      findsOneWidget,
+    );
+    expect(find.text('Guardar y agregar otra'), findsNothing);
   });
 }

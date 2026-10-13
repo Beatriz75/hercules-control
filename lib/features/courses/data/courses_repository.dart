@@ -124,4 +124,19 @@ class CoursesRepository {
         )
         as Map<String, dynamic>,
   );
+
+  /// Adds a question at the end of a lesson's bank (courses.manage).
+  Future<QuestionBankRow> createBankQuestion(
+    int lessonId,
+    PracticeQuestion question,
+  ) async => QuestionBankRow.fromJson(
+    await _api.post(
+          '/questions',
+          body: {
+            'lesson_id': lessonId,
+            ...QuestionBankRow.updatePayload(question.withoutIds()),
+          },
+        )
+        as Map<String, dynamic>,
+  );
 }

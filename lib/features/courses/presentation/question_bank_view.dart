@@ -41,6 +41,7 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
   String? _error;
   var _loading = true;
   var _filter = const QuestionBankFilter();
+  var _loadingCourses = false;
   final _searchController = TextEditingController();
 
   @override
@@ -107,10 +108,7 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
     PracticeQuestion question,
   ) async {
     final errors = practiceQuestionErrors(question);
-    if (errors.isNotEmpty) {
-      return 'Revisa estos puntos antes de guardar:\n'
-          '${errors.map((error) => '• ${error[0].toUpperCase()}${error.substring(1)}').join('\n')}';
-    }
+    if (errors.isNotEmpty) return _formatErrors(errors);
     try {
       final saved = await widget.repository.updateBankQuestion(
         row.id,
@@ -135,6 +133,84 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
     }
   }
 
+  /// Inserts a new row at the end of its lesson group (or course, or list).
+  void _insertRow(QuestionBankRow created) {
+    final rows = [...?_rows];
+    var index = rows.lastIndexWhere((row) => row.lessonId == created.lessonId);
+    if (index == -1) {
+      index = rows.lastIndexWhere((row) => row.courseId == created.courseId);
+    }
+    rows.insert(index == -1 ? rows.length : index + 1, created);
+    setState(() => _rows = rows);
+  }
+
+  /// Creates a question. Returns an error message, or null.
+  Future<String?> _createQuestion(
+    int lessonId,
+    PracticeQuestion question,
+  ) async {
+    final errors = practiceQuestionErrors(question);
+    if (errors.isNotEmpty) return _formatErrors(errors);
+    try {
+      final created = await widget.repository.createBankQuestion(
+        lessonId,
+        question,
+      );
+      if (!mounted) return null;
+      _insertRow(created);
+      _showSnack(
+        context,
+        'Pregunta agregada al banco de «Lección ${created.lessonSortOrder}: ${created.lessonTitle}»',
+      );
+      return null;
+    } on ApiException catch (error) {
+      return error.message;
+    }
+  }
+
+  Future<void> _openCreate() async {
+    if (_loadingCourses) return;
+    setState(() => _loadingCourses = true);
+    List<Course> courses;
+    try {
+      courses = await widget.repository.fetchCourses();
+    } on ApiException catch (error) {
+      if (mounted) {
+        _showSnack(
+          context,
+          'No se pudieron cargar los cursos: ${error.message}',
+        );
+      }
+      return;
+    } finally {
+      if (mounted) setState(() => _loadingCourses = false);
+    }
+    if (!mounted) return;
+
+    final withLessons = [
+      for (final course in courses)
+        if (course.lessons.any((lesson) => lesson.id != null)) course,
+    ];
+    if (withLessons.isEmpty) {
+      _showSnack(
+        context,
+        'Primero crea un curso con al menos una lección en Cursos.',
+      );
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _BankQuestionEditDialog.create(
+        courses: withLessons,
+        initialCourseId: _filter.courseId,
+        initialLessonId: _filter.lessonId,
+        onCreate: _createQuestion,
+      ),
+    );
+  }
+
   void _openEditor(QuestionBankRow row) {
     showDialog<void>(
       context: context,
@@ -151,10 +227,25 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const PageHeader(
+        PageHeader(
           title: 'Banco de preguntas',
           subtitle:
               'Todas las preguntas de todos los cursos. Cada práctica toma preguntas al azar del banco de su lección.',
+          action: widget.canManage
+              ? FilledButton.icon(
+                  onPressed: _rows == null || _loadingCourses
+                      ? null
+                      : _openCreate,
+                  icon: _loadingCourses
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_rounded),
+                  label: const Text('Nueva pregunta'),
+                )
+              : null,
         ),
         const SizedBox(height: 20),
         Expanded(child: _buildBody(context)),
@@ -638,12 +729,40 @@ class _BankQuestionCard extends StatelessWidget {
   }
 }
 
-/// Edits one question of the bank, reusing the course editor's card.
-class _BankQuestionEditDialog extends StatefulWidget {
-  const _BankQuestionEditDialog({required this.row, required this.onSave});
+String _formatErrors(List<String> errors) =>
+    'Revisa estos puntos antes de guardar:\n'
+    '${errors.map((error) => '• ${error[0].toUpperCase()}${error.substring(1)}').join('\n')}';
 
-  final QuestionBankRow row;
-  final Future<String?> Function(PracticeQuestion question) onSave;
+/// Edits one question of the bank, or creates a new one in a chosen
+/// lesson, reusing the course editor's question card.
+class _BankQuestionEditDialog extends StatefulWidget {
+  const _BankQuestionEditDialog({
+    required QuestionBankRow this.row,
+    required this.onSave,
+  }) : courses = const [],
+       initialCourseId = null,
+       initialLessonId = null,
+       onCreate = null;
+
+  const _BankQuestionEditDialog.create({
+    required this.courses,
+    required this.initialCourseId,
+    required this.initialLessonId,
+    required this.onCreate,
+  }) : row = null,
+       onSave = null;
+
+  final QuestionBankRow? row;
+  final Future<String?> Function(PracticeQuestion question)? onSave;
+
+  /// Create mode: courses (with lessons) to choose from.
+  final List<Course> courses;
+  final int? initialCourseId;
+  final int? initialLessonId;
+  final Future<String?> Function(int lessonId, PracticeQuestion question)?
+  onCreate;
+
+  bool get isCreate => row == null;
 
   @override
   State<_BankQuestionEditDialog> createState() =>
@@ -652,10 +771,34 @@ class _BankQuestionEditDialog extends StatefulWidget {
 
 class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
   final _formKey = GlobalKey<FormState>();
-  late PracticeQuestion _draft = widget.row.question;
+  late PracticeQuestion _draft =
+      widget.row?.question ?? PracticeQuestion.blank();
   var _dirty = false;
   var _saving = false;
+  var _generation = 0;
   String? _error;
+  int? _courseId;
+  int? _lessonId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isCreate) {
+      final course = _courseById(widget.initialCourseId);
+      _courseId = course?.id;
+      if (course != null &&
+          course.lessons.any((lesson) => lesson.id == widget.initialLessonId)) {
+        _lessonId = widget.initialLessonId;
+      }
+    }
+  }
+
+  Course? _courseById(int? id) {
+    for (final course in widget.courses) {
+      if (course.id == id) return course;
+    }
+    return null;
+  }
 
   Future<void> _requestClose() async {
     if (_saving) return;
@@ -684,23 +827,101 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
     Navigator.of(context).pop();
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool addAnother = false}) async {
     if (_saving) return;
     _formKey.currentState?.validate();
+    if (widget.isCreate && (_courseId == null || _lessonId == null)) {
+      setState(() => _error = 'Elige el curso y la lección.');
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
     });
-    final error = await widget.onSave(_draft);
+    final error = widget.isCreate
+        ? await widget.onCreate!(_lessonId!, _draft)
+        : await widget.onSave!(_draft);
     if (!mounted) return;
-    if (error == null) {
+    if (error != null) {
+      setState(() {
+        _saving = false;
+        _error = error;
+      });
+      return;
+    }
+    if (!addAnother) {
       Navigator.of(context).pop();
       return;
     }
+    // Same course and lesson, empty question.
     setState(() {
       _saving = false;
-      _error = error;
+      _dirty = false;
+      _draft = PracticeQuestion.blank();
+      _generation++;
     });
+  }
+
+  Widget _lessonPickers() {
+    final course = _courseById(_courseId);
+    final lessons = [
+      for (final lesson in (course?.lessons ?? const <Lesson>[]).indexed)
+        if (lesson.$2.id != null) lesson,
+    ];
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        SizedBox(
+          width: 340,
+          child: DropdownButtonFormField<int>(
+            initialValue: _courseId,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Curso'),
+            items: [
+              for (final course in widget.courses)
+                DropdownMenuItem(
+                  value: course.id,
+                  child: Text(course.title, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            validator: (value) =>
+                value == null ? 'Elige el curso y la lección.' : null,
+            onChanged: _saving
+                ? null
+                : (value) => setState(() {
+                    _courseId = value;
+                    _lessonId = null;
+                  }),
+          ),
+        ),
+        SizedBox(
+          width: 360,
+          child: DropdownButtonFormField<int>(
+            key: ValueKey('bank-lesson-$_courseId'),
+            initialValue: _lessonId,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Lección'),
+            items: [
+              for (final lesson in lessons)
+                DropdownMenuItem(
+                  value: lesson.$2.id,
+                  child: Text(
+                    'Lección ${lesson.$1 + 1}: ${lesson.$2.title}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            validator: (value) =>
+                value == null ? 'Elige el curso y la lección.' : null,
+            onChanged: _saving || course == null
+                ? null
+                : (value) => setState(() => _lessonId = value),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -734,12 +955,14 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${row.courseTitle} · Lección ${row.lessonSortOrder}: ${row.lessonTitle}',
+                            row == null
+                                ? 'Banco de preguntas'
+                                : '${row.courseTitle} · Lección ${row.lessonSortOrder}: ${row.lessonTitle}',
                             style: Theme.of(context).textTheme.labelLarge,
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Editar pregunta',
+                            row == null ? 'Nueva pregunta' : 'Editar pregunta',
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                         ],
@@ -758,12 +981,24 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
                     key: _formKey,
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                     child: SingleChildScrollView(
-                      child: _QuestionEditorCard.standalone(
-                        question: _draft,
-                        onChanged: (question) => setState(() {
-                          _draft = question;
-                          _dirty = true;
-                        }),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (widget.isCreate) ...[
+                            _lessonPickers(),
+                            const SizedBox(height: 16),
+                          ],
+                          KeyedSubtree(
+                            key: ValueKey('bank-question-$_generation'),
+                            child: _QuestionEditorCard.standalone(
+                              question: _draft,
+                              onChanged: (question) => setState(() {
+                                _draft = question;
+                                _dirty = true;
+                              }),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -801,6 +1036,14 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
                         _saving ? 'Guardando...' : 'Guardar pregunta',
                       ),
                     ),
+                    if (widget.isCreate)
+                      OutlinedButton.icon(
+                        onPressed: _saving
+                            ? null
+                            : () => _save(addAnother: true),
+                        icon: const Icon(Icons.playlist_add_rounded),
+                        label: const Text('Guardar y agregar otra'),
+                      ),
                     OutlinedButton.icon(
                       onPressed: _saving ? null : _requestClose,
                       icon: const Icon(Icons.close_rounded),

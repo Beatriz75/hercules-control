@@ -270,3 +270,9 @@ class QuestionBankRow(BaseModel):
     course_status: str
     course_active: bool
     stores: list[str]
+
+
+class QuestionCreate(QuestionUpdate):
+    """Body to add a question to a lesson's bank from the general bank view."""
+
+    lesson_id: int

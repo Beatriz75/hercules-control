@@ -5,12 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import require_permission
-from app.api.routers.courses import _apply_question
+from app.api.routers.courses import _RETIRED_SORT_OFFSET, _apply_question, _new_question
 from app.core.permissions import Permission
 from app.db.session import get_db
 from app.models.course import Course, CourseLesson, TrainingQuestion
 from app.models.user import User
-from app.schemas.course import QuestionBankRow, QuestionUpdate
+from app.schemas.course import QuestionBankRow, QuestionCreate, QuestionUpdate
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -70,6 +70,23 @@ def list_question_bank(
         query.order_by(Course.sort_order, Course.id, CourseLesson.sort_order, TrainingQuestion.sort_order)
     ).unique()
     return [_row(question) for question in questions]
+
+
+@router.post("", response_model=QuestionBankRow, status_code=status.HTTP_201_CREATED)
+def create_question(payload: QuestionCreate, _: CourseManager, db: Session = Depends(get_db)) -> QuestionBankRow:
+    """Add a question at the end of a lesson's bank."""
+    lesson = db.scalar(
+        select(CourseLesson)
+        .options(selectinload(CourseLesson.questions))
+        .where(CourseLesson.id == payload.lesson_id, CourseLesson.active.is_(True))
+    )
+    if lesson is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se encontró la lección.")
+    used = [q.sort_order for q in lesson.questions if q.sort_order < _RETIRED_SORT_OFFSET]
+    question = _new_question(payload.model_copy(update={"sort_order": max(used, default=0) + 1}))
+    lesson.questions.append(question)
+    db.commit()
+    return _row(db.scalar(_bank_query().where(TrainingQuestion.id == question.id)))
 
 
 @router.put("/{question_id}", response_model=QuestionBankRow)
