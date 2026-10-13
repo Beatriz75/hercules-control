@@ -1,16 +1,17 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import require_permission
 from app.api.routers.courses import _RETIRED_SORT_OFFSET, _apply_question, _new_question
 from app.core.permissions import Permission
+from app.core.similarity import similarity
 from app.db.session import get_db
 from app.models.course import Course, CourseLesson, TrainingQuestion
 from app.models.user import User
-from app.schemas.course import QuestionBankRow, QuestionCreate, QuestionUpdate
+from app.schemas.course import QuestionBankRow, QuestionCreate, QuestionUpdate, SimilarQuestionRow
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -71,6 +72,32 @@ def list_question_bank(
         query.order_by(Course.sort_order, Course.id, CourseLesson.sort_order, TrainingQuestion.sort_order)
     ).unique()
     return [_row(question) for question in questions]
+
+
+SIMILARITY_THRESHOLD = 0.6
+
+
+@router.get("/similar", response_model=list[SimilarQuestionRow])
+def similar_questions(
+    _: CourseManager,
+    prompt: str = Query(min_length=3, max_length=4000),
+    exclude_id: int | None = None,
+    limit: int = Query(default=5, ge=1, le=20),
+    db: Session = Depends(get_db),
+) -> list[SimilarQuestionRow]:
+    """Existing active questions that look like `prompt` (any course), most similar first."""
+    matches = []
+    for question in db.scalars(_bank_query()).unique():
+        if question.id == exclude_id:
+            continue
+        score = similarity(prompt, question.prompt)
+        if score >= SIMILARITY_THRESHOLD:
+            matches.append((score, question))
+    matches.sort(key=lambda item: item[0], reverse=True)
+    return [
+        SimilarQuestionRow(**_row(question).model_dump(), similarity=round(score, 2))
+        for score, question in matches[:limit]
+    ]
 
 
 @router.post("", response_model=QuestionBankRow, status_code=status.HTTP_201_CREATED)

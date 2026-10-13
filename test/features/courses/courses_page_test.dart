@@ -11,6 +11,8 @@ import 'package:hercules_control/core/theme/app_theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'question_bank_test.dart' show bankRowJson;
+
 Map<String, dynamic> _question(int lessonId, int index) => {
   'id': lessonId * 10 + index,
   'lesson_id': lessonId,
@@ -83,6 +85,9 @@ http.Response _json(Object body, [int status = 200]) => http.Response(
 );
 
 final _starts = <Map<String, dynamic>>[];
+final _coursePuts = <Map<String, dynamic>>[];
+final _similarPrompts = <String>[];
+var _similarFails = false;
 final _attempts = <Map<String, dynamic>>[];
 var _approveAttempts = true;
 
@@ -94,6 +99,25 @@ Future<AuthController> _signIn(
 }) async {
   final client = MockClient((request) async {
     final path = request.url.path;
+    if (path.endsWith('/questions/similar')) {
+      final prompt = request.url.queryParameters['prompt']!;
+      _similarPrompts.add(prompt);
+      if (_similarFails) return _json({'detail': 'Error interno.'}, 500);
+      return _json([
+        if (prompt.contains('SPEI'))
+          {
+            ...bankRowJson(
+              id: 7,
+              prompt: 'Cómo se valida una transferencia SPEI',
+            ),
+            'similarity': 0.91,
+          },
+      ]);
+    }
+    if (request.method == 'PUT' && path.endsWith('/courses/1')) {
+      _coursePuts.add(jsonDecode(request.body) as Map<String, dynamic>);
+      return _json(_course(student: false));
+    }
     if (path.endsWith('/training-attempts/start')) {
       final body = jsonDecode(request.body) as Map<String, dynamic>;
       _starts.add(body);
@@ -231,6 +255,9 @@ void main() {
     _starts.clear();
     _attempts.clear();
     _approveAttempts = true;
+    _coursePuts.clear();
+    _similarPrompts.clear();
+    _similarFails = false;
   });
 
   testWidgets('alumno sees assigned courses, progress and bank size', (
@@ -440,6 +467,72 @@ void main() {
     await _settle(tester);
     expect(find.text('1/2'), findsOneWidget);
     expect(find.text('12/10/2026 3:30 p. m.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  Future<void> addNewQuestionAndSave(WidgetTester tester) async {
+    final auth = await _signIn(tester, 'administrador', [
+      'courses.view',
+      'courses.manage',
+    ]);
+    await _pumpShell(tester, auth);
+    await tester.tap(find.text('Editar plantilla'));
+    await _settle(tester);
+
+    final add = find.text('Agregar pregunta');
+    await tester.ensureVisible(add);
+    await tester.tap(add);
+    await _settle(tester);
+
+    // Last card: question text, option 1, option 2.
+    final fields = find.byType(TextFormField);
+    final count = tester.widgetList(fields).length;
+    await tester.enterText(fields.at(count - 3), '¿Cómo valido un SPEI?');
+    await tester.enterText(fields.at(count - 2), 'En Banxico');
+    await tester.enterText(fields.at(count - 1), 'No se valida');
+    await tester.pump();
+    await tester.tap(find.text('Guardar curso'));
+    await _settle(tester);
+  }
+
+  testWidgets('course editor groups similar matches of new questions', (
+    tester,
+  ) async {
+    await addNewQuestionAndSave(tester);
+
+    // Only the new question (without id) is checked.
+    expect(_similarPrompts, ['¿Cómo valido un SPEI?']);
+    expect(
+      find.text('Hay 1 pregunta nueva parecida a otras del banco'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Lección 1, pregunta 4: ¿Cómo valido un SPEI?'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('91 % parecida'), findsOneWidget);
+
+    await tester.tap(find.text('Revisar'));
+    await _settle(tester);
+    expect(_coursePuts, isEmpty);
+
+    await tester.tap(find.text('Guardar curso'));
+    await _settle(tester);
+    await tester.tap(find.text('Guardar de todos modos'));
+    await _settle(tester);
+    expect(_coursePuts, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('course editor saves when the similar check fails', (
+    tester,
+  ) async {
+    _similarFails = true;
+    await addNewQuestionAndSave(tester);
+
+    expect(_similarPrompts, hasLength(1));
+    expect(find.textContaining('parecida'), findsNothing);
+    expect(_coursePuts, hasLength(1));
     expect(tester.takeException(), isNull);
   });
 }

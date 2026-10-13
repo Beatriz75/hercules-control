@@ -128,3 +128,20 @@ class QuestionBankFilter {
       if (matches(row)) row,
   ];
 }
+
+/// Row of `GET /questions/similar`: an existing question and how similar it
+/// is to the text being written (0..1, the server returns >= 0.6).
+class SimilarQuestion {
+  const SimilarQuestion({required this.row, required this.similarity});
+
+  factory SimilarQuestion.fromJson(Map<String, dynamic> json) =>
+      SimilarQuestion(
+        row: QuestionBankRow.fromJson(json),
+        similarity: (json['similarity'] as num?)?.toDouble() ?? 0,
+      );
+
+  final QuestionBankRow row;
+  final double similarity;
+
+  int get percent => (similarity * 100).round();
+}

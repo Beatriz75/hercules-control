@@ -10,6 +10,7 @@ Primera versión desplegable: inicio de sesión, 5 roles (Administrador, Supervi
 
 - Despliegue: [docs/DEPLOY.md](docs/DEPLOY.md)
 - Notas de versión: [docs/releases/](docs/releases/)
+- Próximo: [examen de simulación](docs/diseno_examen_simulacion.md) (diseño de interfaces pendiente)
 - Puertos: la app y la API se publican juntas en `WEB_PORT` (por defecto `8080`; la API en `/api`). Postgres y el backend no publican puertos. En desarrollo, `docker-compose.dev.yml` publica la API en `8000`.
 - Ramas y versiones: ver la skill `.claude/skills/colaboracion-desarrollo-despliegue/SKILL.md`.
 

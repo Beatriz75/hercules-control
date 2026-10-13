@@ -152,3 +152,23 @@ def test_add_question_from_bank_goes_to_the_end_of_the_lesson(client: TestClient
     client.act_as(Role.ADMINISTRADOR, "admin")
     assert client.post("/questions", json=body | {"lesson_id": 9999}).status_code == 404
     assert client.post("/questions", json=body | {"prompt": ""}).status_code == 422
+
+
+def test_similar_questions_detects_repeats_across_courses(client: TestClient) -> None:
+    _course(client, "Cobranza", ["Ofertas"], ["¿Cuál es el tiempo máximo de respuesta establecido?", "¿Dónde se valida una transferencia?"])
+    _course(client, "Líneas", ["Mexi"], ["¿Qué foto de perfil se coloca el Día 1?"])
+
+    similar = client.get("/questions/similar", params={"prompt": "cual es el tiempo maximo de respuesta"}).json()
+    assert [row["prompt"] for row in similar] == ["¿Cuál es el tiempo máximo de respuesta establecido?"]
+    assert similar[0]["similarity"] >= 0.6 and similar[0]["course_title"] == "Cobranza"
+
+    reordered = client.get("/questions/similar", params={"prompt": "¿Se valida dónde una transferencia?"}).json()
+    assert reordered and reordered[0]["prompt"] == "¿Dónde se valida una transferencia?"
+
+    assert client.get("/questions/similar", params={"prompt": "¿Cuántas llamadas diarias exige la etapa Llamar?"}).json() == []
+
+    own = similar[0]["id"]
+    assert client.get("/questions/similar", params={"prompt": similar[0]["prompt"], "exclude_id": own}).json() == []
+
+    client.act_as(Role.SUPERVISOR, "sup")
+    assert client.get("/questions/similar", params={"prompt": "tiempo de respuesta"}).status_code == 403

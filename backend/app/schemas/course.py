@@ -312,3 +312,7 @@ class QuestionCreate(QuestionUpdate):
     """Body to add a question to a lesson's bank from the general bank view."""
 
     lesson_id: int
+
+
+class SimilarQuestionRow(QuestionBankRow):
+    similarity: float

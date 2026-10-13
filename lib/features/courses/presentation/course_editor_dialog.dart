@@ -8,6 +8,7 @@ class _CourseTemplateEditorDialog extends StatefulWidget {
     required this.course,
     required this.initialLessonIndex,
     required this.onSave,
+    this.findSimilar,
   });
 
   final Course course;
@@ -15,6 +16,9 @@ class _CourseTemplateEditorDialog extends StatefulWidget {
 
   /// Persists the draft. Returns an error message, or null on success.
   final Future<String?> Function(Course course) onSave;
+
+  /// Looks for existing questions similar to a new one (optional).
+  final Future<List<SimilarQuestion>> Function(String prompt)? findSimilar;
 
   @override
   State<_CourseTemplateEditorDialog> createState() =>
@@ -302,6 +306,96 @@ class _CourseTemplateEditorDialogState
     return result ?? false;
   }
 
+  /// Checks the NEW questions (without id) against the bank. Returns false
+  /// when the admin chose "Revisar". Network errors never block saving.
+  Future<bool> _confirmSimilarQuestions() async {
+    final findSimilar = widget.findSimilar;
+    if (findSimilar == null) return true;
+
+    final pending = <String, String>{};
+    for (final lesson in _draft.lessons.indexed) {
+      for (final question in lesson.$2.questions.indexed) {
+        final prompt = question.$2.prompt.trim();
+        if (question.$2.id != null || prompt.length < 3) continue;
+        // The same new text twice in the course is checked only once.
+        pending.putIfAbsent(
+          normalizeForSearch(prompt),
+          () =>
+              'Lección ${lesson.$1 + 1}, pregunta ${question.$1 + 1}: $prompt',
+        );
+      }
+    }
+    if (pending.isEmpty) return true;
+
+    final groups = <String, List<SimilarQuestion>>{};
+    await Future.wait([
+      for (final entry in pending.entries)
+        () async {
+          try {
+            final prompt = entry.value.substring(entry.value.indexOf(': ') + 2);
+            final matches = await findSimilar(prompt);
+            if (matches.isNotEmpty) groups[entry.value] = matches;
+          } catch (_) {
+            // Don't block saving on a failed check.
+          }
+        }(),
+    ]);
+    if (groups.isEmpty || !mounted) return true;
+
+    final ordered = [
+      for (final label in pending.values)
+        if (groups.containsKey(label)) MapEntry(label, groups[label]!),
+    ];
+    final total = ordered.length;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          total == 1
+              ? 'Hay 1 pregunta nueva parecida a otras del banco'
+              : 'Hay $total preguntas nuevas parecidas a otras del banco',
+        ),
+        content: SizedBox(
+          width: 620,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final group in ordered) ...[
+                  Text(
+                    group.key,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  for (final match in group.value)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, bottom: 4),
+                      child: Text(
+                        '• ${match.row.question.prompt} — ${_similarPlace(match.row)} · ${match.percent} % parecida',
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Revisar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Guardar de todos modos'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   Future<void> _requestClose() async {
     if (_saving) return;
     if (_dirty) {
@@ -331,6 +425,11 @@ class _CourseTemplateEditorDialogState
       _saving = true;
       _saveError = null;
     });
+    if (!await _confirmSimilarQuestions()) {
+      if (mounted) setState(() => _saving = false);
+      return;
+    }
+    if (!mounted) return;
     final error = await widget.onSave(_draft);
     if (!mounted) return;
     if (error == null) {
@@ -1019,13 +1118,15 @@ class _QuestionEditorCard extends StatelessWidget {
     required this.onMoveUp,
     required this.onMoveDown,
     required this.onRemove,
-  }) : standalone = false;
+  }) : standalone = false,
+       belowPrompt = null;
 
   /// Edits a single question outside the course editor (question bank):
   /// hides ordering, removal and the lesson picker.
   const _QuestionEditorCard.standalone({
     required this.question,
     required this.onChanged,
+    this.belowPrompt,
   }) : number = 1,
        lessonIndex = 0,
        lessons = const [],
@@ -1043,6 +1144,9 @@ class _QuestionEditorCard extends StatelessWidget {
   static void _noop() {}
 
   final bool standalone;
+
+  /// Extra content right under the question text (similar questions).
+  final Widget? belowPrompt;
   final int number;
   final PracticeQuestion question;
   final int lessonIndex;
@@ -1342,6 +1446,7 @@ class _QuestionEditorCard extends StatelessWidget {
                 : null,
             onChanged: (value) => onChanged(question.copyWith(prompt: value)),
           ),
+          if (belowPrompt != null) ...[const SizedBox(height: 8), belowPrompt!],
           const SizedBox(height: 12),
           RadioGroup<int>(
             groupValue: correctIndexes.isEmpty ? null : correctIndexes.first,

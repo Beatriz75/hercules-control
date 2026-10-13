@@ -21,6 +21,10 @@ http.Response _json(Object body, [int status = 200]) => http.Response(
 
 final _puts = <String, Map<String, dynamic>>{};
 final _posts = <Map<String, dynamic>>[];
+final _similarQueries = <Map<String, String>>[];
+
+/// null = the similar endpoint fails (500).
+List<Map<String, dynamic>>? _similarReply = [];
 var _courses = <Map<String, dynamic>>[];
 
 Map<String, dynamic> _courseJson() => {
@@ -70,6 +74,13 @@ Future<AuthController> _signIn(
         'store_code': null,
         'permissions': permissions,
       });
+    }
+    if (path.endsWith('/questions/similar')) {
+      _similarQueries.add(request.url.queryParameters);
+      if (_similarReply == null) {
+        return _json({'detail': 'Error interno.'}, 500);
+      }
+      return _json(_similarReply!);
     }
     if (request.method == 'POST' && path.endsWith('/questions')) {
       final body = jsonDecode(request.body) as Map<String, dynamic>;
@@ -138,6 +149,8 @@ void main() {
     _puts.clear();
     _posts.clear();
     _courses = [_courseJson()];
+    _similarQueries.clear();
+    _similarReply = [];
   });
 
   testWidgets('supervisor sees the bank read-only with correct answers', (
@@ -299,7 +312,7 @@ void main() {
       await _settle(tester);
 
       // Fields in the card: video link, question text, option 1, option 2.
-    final fields = find.descendant(
+      final fields = find.descendant(
         of: find.byType(Dialog),
         matching: find.byType(TextFormField),
       );
@@ -351,5 +364,175 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Guardar y agregar otra'), findsNothing);
+  });
+
+  Future<Finder> openCreateWithLesson(WidgetTester tester) async {
+    await tester.tap(find.text('Nueva pregunta'));
+    await _settle(tester);
+    await tester.tap(
+      find.widgetWithText(DropdownButtonFormField<int>, 'Curso'),
+    );
+    await _settle(tester);
+    await tester.tap(find.text('Ruta Ofertas').last);
+    await _settle(tester);
+    await tester.tap(
+      find.widgetWithText(DropdownButtonFormField<int>, 'Lección'),
+    );
+    await _settle(tester);
+    await tester.tap(find.text('Lección 2: Transferencias').last);
+    await _settle(tester);
+    // Fields in the card: video link, question text, option 1, option 2.
+    return find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextFormField),
+    );
+  }
+
+  Future<void> fillQuestion(WidgetTester tester, Finder fields) async {
+    await tester.enterText(
+      fields.at(1),
+      '¿Cómo valido una transferencia SPEI?',
+    );
+    await tester.enterText(fields.at(2), 'En Banxico');
+    await tester.enterText(fields.at(3), 'No se valida');
+    await tester.pump(const Duration(milliseconds: 700));
+    await _settle(tester);
+  }
+
+  Future<AuthController> signInAdmin(WidgetTester tester) =>
+      _signIn(tester, 'administrador', ['courses.view', 'courses.manage']);
+
+  testWidgets('typing shows similar questions; save asks before creating', (
+    tester,
+  ) async {
+    _similarReply = [
+      {
+        ...bankRowJson(id: 7, prompt: 'Cómo se valida una transferencia SPEI'),
+        'similarity': 0.87,
+      },
+    ];
+    await _openBank(tester, await signInAdmin(tester));
+    final fields = await openCreateWithLesson(tester);
+    await fillQuestion(tester, fields);
+
+    expect(
+      _similarQueries.last['prompt'],
+      '¿Cómo valido una transferencia SPEI?',
+    );
+    expect(_similarQueries.last.containsKey('exclude_id'), isFalse);
+    expect(find.text('Preguntas parecidas en el banco (1)'), findsOneWidget);
+    expect(find.text('87 % parecida'), findsOneWidget);
+    expect(find.text('Correcta: Revisar en Banxico'), findsOneWidget);
+
+    await tester.tap(find.text('Ver'));
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Aceptarlo'),
+      ),
+      findsOneWidget,
+    );
+
+    // "Revisar" goes back to the form without posting.
+    await tester.tap(find.text('Guardar pregunta'));
+    await _settle(tester);
+    expect(find.text('Hay 1 pregunta parecida'), findsOneWidget);
+    await tester.tap(find.text('Revisar'));
+    await _settle(tester);
+    expect(_posts, isEmpty);
+    expect(find.text('Guardar y agregar otra'), findsOneWidget);
+
+    // "Guardar de todos modos" creates it.
+    await tester.tap(find.text('Guardar pregunta'));
+    await _settle(tester);
+    await tester.tap(find.text('Guardar de todos modos'));
+    await _settle(tester);
+    expect(_posts, hasLength(1));
+    expect(find.text('Guardar y agregar otra'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('no similar questions shows the green note and saves directly', (
+    tester,
+  ) async {
+    await _openBank(tester, await signInAdmin(tester));
+    final fields = await openCreateWithLesson(tester);
+    await fillQuestion(tester, fields);
+
+    expect(find.text('No hay preguntas parecidas'), findsOneWidget);
+    await tester.tap(find.text('Guardar pregunta'));
+    await _settle(tester);
+    expect(find.text('Hay 1 pregunta parecida'), findsNothing);
+    expect(_posts, hasLength(1));
+  });
+
+  testWidgets('a failing similar check does not block saving', (tester) async {
+    _similarReply = null;
+    await _openBank(tester, await signInAdmin(tester));
+    final fields = await openCreateWithLesson(tester);
+    await fillQuestion(tester, fields);
+
+    expect(
+      find.text('No se pudo comprobar si hay preguntas parecidas'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Guardar pregunta'));
+    await _settle(tester);
+    expect(_posts, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Editar checks similar questions excluding itself', (
+    tester,
+  ) async {
+    _similarReply = [
+      {
+        ...bankRowJson(id: 7, prompt: 'Cómo se valida una transferencia SPEI'),
+        'similarity': 0.87,
+      },
+    ];
+    await _openBank(tester, await signInAdmin(tester));
+
+    await tester.tap(find.text('Editar').first);
+    await _settle(tester);
+    expect(_similarQueries.single['exclude_id'], '1');
+    expect(find.text('Preguntas parecidas en el banco (1)'), findsOneWidget);
+
+    // Informational only: saving doesn't ask.
+    await tester.tap(find.text('Guardar pregunta'));
+    await _settle(tester);
+    expect(find.text('Hay 1 pregunta parecida'), findsNothing);
+    expect(_puts.keys, ['/api/questions/1']);
+  });
+
+  testWidgets('"Editar esa pregunta" switches to the existing question', (
+    tester,
+  ) async {
+    _similarReply = [
+      {
+        ...bankRowJson(id: 7, prompt: 'Cómo se valida una transferencia SPEI'),
+        'similarity': 0.87,
+      },
+    ];
+    await _openBank(tester, await signInAdmin(tester));
+    final fields = await openCreateWithLesson(tester);
+    await fillQuestion(tester, fields);
+
+    await tester.tap(find.text('Editar esa pregunta'));
+    await _settle(tester);
+    expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+    await tester.tap(find.text('Descartar'));
+    await _settle(tester);
+
+    expect(find.text('Editar pregunta'), findsOneWidget);
+    expect(
+      find.widgetWithText(
+        TextFormField,
+        'Cómo se valida una transferencia SPEI',
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 }

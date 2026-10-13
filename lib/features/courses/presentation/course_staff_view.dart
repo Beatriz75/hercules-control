@@ -146,6 +146,7 @@ class _StaffCoursesViewState extends State<_StaffCoursesView> {
         course: course,
         initialLessonIndex: initialLessonIndex,
         onSave: _saveCourse,
+        findSimilar: (prompt) => widget.repository.findSimilarQuestions(prompt),
       ),
     );
   }

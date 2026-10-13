@@ -207,9 +207,14 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
         initialCourseId: _filter.courseId,
         initialLessonId: _filter.lessonId,
         onCreate: _createQuestion,
+        findSimilar: _findSimilar,
+        onEditExisting: _openEditor,
       ),
     );
   }
+
+  Future<List<SimilarQuestion>> _findSimilar(String prompt, int? excludeId) =>
+      widget.repository.findSimilarQuestions(prompt, excludeId: excludeId);
 
   void _openEditor(QuestionBankRow row) {
     showDialog<void>(
@@ -218,6 +223,8 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
       builder: (context) => _BankQuestionEditDialog(
         row: row,
         onSave: (question) => _saveQuestion(row, question),
+        findSimilar: _findSimilar,
+        onEditExisting: _openEditor,
       ),
     );
   }
@@ -766,6 +773,8 @@ class _BankQuestionEditDialog extends StatefulWidget {
   const _BankQuestionEditDialog({
     required QuestionBankRow this.row,
     required this.onSave,
+    this.findSimilar,
+    this.onEditExisting,
   }) : courses = const [],
        initialCourseId = null,
        initialLessonId = null,
@@ -776,8 +785,17 @@ class _BankQuestionEditDialog extends StatefulWidget {
     required this.initialCourseId,
     required this.initialLessonId,
     required this.onCreate,
+    this.findSimilar,
+    this.onEditExisting,
   }) : row = null,
        onSave = null;
+
+  /// Similar-question lookup (prompt, id to exclude).
+  final Future<List<SimilarQuestion>> Function(String prompt, int? excludeId)?
+  findSimilar;
+
+  /// Opens the editor of an existing (similar) question.
+  final ValueChanged<QuestionBankRow>? onEditExisting;
 
   final QuestionBankRow? row;
   final Future<String?> Function(PracticeQuestion question)? onSave;
@@ -807,9 +825,175 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
   int? _courseId;
   int? _lessonId;
 
+  // Similar questions of the current text.
+  static const _similarDebounce = Duration(milliseconds: 600);
+  static const _similarMinLength = 10;
+  Timer? _similarTimer;
+  String? _checkedPrompt;
+  List<SimilarQuestion>? _similar;
+  var _checkingSimilar = false;
+  var _similarFailed = false;
+
+  @override
+  void dispose() {
+    _similarTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onDraftChanged(PracticeQuestion question) {
+    final promptChanged = question.prompt != _draft.prompt;
+    setState(() {
+      _draft = question;
+      _dirty = true;
+    });
+    if (!promptChanged || widget.findSimilar == null) return;
+    _similarTimer?.cancel();
+    if (question.prompt.trim().length < _similarMinLength) {
+      setState(() {
+        _similar = null;
+        _similarFailed = false;
+        _checkedPrompt = null;
+      });
+      return;
+    }
+    _similarTimer = Timer(_similarDebounce, _checkSimilar);
+  }
+
+  /// Runs the similar-question lookup for the current text.
+  Future<void> _checkSimilar() async {
+    final findSimilar = widget.findSimilar;
+    final prompt = _draft.prompt.trim();
+    if (findSimilar == null || prompt.length < 3) return;
+    setState(() => _checkingSimilar = true);
+    try {
+      final similar = await findSimilar(prompt, widget.row?.id);
+      if (!mounted || _draft.prompt.trim() != prompt) return;
+      setState(() {
+        _similar = similar;
+        _similarFailed = false;
+        _checkedPrompt = prompt;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _similar = null;
+        _similarFailed = true;
+        _checkedPrompt = prompt;
+      });
+    } finally {
+      if (mounted) setState(() => _checkingSimilar = false);
+    }
+  }
+
+  /// Before creating: asks when the latest check found similar questions.
+  Future<bool> _confirmSimilarOnSave() async {
+    if (!widget.isCreate || widget.findSimilar == null) return true;
+    _similarTimer?.cancel();
+    if (_checkedPrompt != _draft.prompt.trim()) await _checkSimilar();
+    final similar = _similar ?? const <SimilarQuestion>[];
+    if (similar.isEmpty || !mounted) return true;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          similar.length == 1
+              ? 'Hay 1 pregunta parecida'
+              : 'Hay ${similar.length} preguntas parecidas',
+        ),
+        content: SizedBox(
+          width: 560,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Revisa que no estés repitiendo una pregunta que ya existe en el banco.',
+                ),
+                const SizedBox(height: 12),
+                for (final match in similar)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '• ${match.row.question.prompt}\n   ${_similarPlace(match.row)} · ${match.percent} % parecida',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Revisar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Guardar de todos modos'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  /// Leaves this dialog (confirming discard) and edits [row] instead.
+  Future<void> _editExisting(QuestionBankRow row) async {
+    final onEditExisting = widget.onEditExisting;
+    if (onEditExisting == null || _saving) return;
+    if (_dirty && !await _confirmDiscard()) return;
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    onEditExisting(row);
+  }
+
+  Future<bool> _confirmDiscard() async {
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Descartar los cambios?'),
+        content: const Text(
+          'Tienes cambios sin guardar en esta pregunta. Si cierras, se pierden.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Descartar'),
+          ),
+        ],
+      ),
+    );
+    return discard == true;
+  }
+
+  Widget? _similarPanel() {
+    if (widget.findSimilar == null) return null;
+    if (_draft.prompt.trim().length < _similarMinLength &&
+        _checkedPrompt == null) {
+      return null;
+    }
+    return _SimilarQuestionsPanel(
+      similar: _similar,
+      failed: _similarFailed,
+      checking: _checkingSimilar,
+      onEdit: widget.onEditExisting == null ? null : _editExisting,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+    // Editing: show (informational) similar questions right away.
+    if (!widget.isCreate &&
+        widget.findSimilar != null &&
+        _draft.prompt.trim().length >= _similarMinLength) {
+      _similarTimer = Timer(Duration.zero, _checkSimilar);
+    }
     if (widget.isCreate) {
       final course = _courseById(widget.initialCourseId);
       _courseId = course?.id;
@@ -829,28 +1013,8 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
 
   Future<void> _requestClose() async {
     if (_saving) return;
-    if (_dirty) {
-      final discard = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('¿Descartar los cambios?'),
-          content: const Text(
-            'Tienes cambios sin guardar en esta pregunta. Si cierras, se pierden.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Descartar'),
-            ),
-          ],
-        ),
-      );
-      if (discard != true || !mounted) return;
-    }
+    if (_dirty && (!await _confirmDiscard() || !mounted)) return;
+    _similarTimer?.cancel();
     Navigator.of(context).pop();
   }
 
@@ -865,6 +1029,11 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
       _saving = true;
       _error = null;
     });
+    if (!await _confirmSimilarOnSave()) {
+      if (mounted) setState(() => _saving = false);
+      return;
+    }
+    if (!mounted) return;
     final error = widget.isCreate
         ? await widget.onCreate!(_lessonId!, _draft)
         : await widget.onSave!(_draft);
@@ -886,6 +1055,9 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
       _dirty = false;
       _draft = PracticeQuestion.blank();
       _generation++;
+      _similar = null;
+      _similarFailed = false;
+      _checkedPrompt = null;
     });
   }
 
@@ -1019,10 +1191,8 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
                             key: ValueKey('bank-question-$_generation'),
                             child: _QuestionEditorCard.standalone(
                               question: _draft,
-                              onChanged: (question) => setState(() {
-                                _draft = question;
-                                _dirty = true;
-                              }),
+                              onChanged: _onDraftChanged,
+                              belowPrompt: _similarPanel(),
                             ),
                           ),
                         ],
@@ -1083,6 +1253,184 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
           ),
         ),
       ),
+    );
+  }
+}
+
+String _similarPlace(QuestionBankRow row) =>
+    '${row.courseTitle} · Lección ${row.lessonSortOrder}: ${row.lessonTitle}';
+
+/// Amber panel with the existing questions similar to the text being typed.
+class _SimilarQuestionsPanel extends StatefulWidget {
+  const _SimilarQuestionsPanel({
+    required this.similar,
+    required this.failed,
+    required this.checking,
+    required this.onEdit,
+  });
+
+  final List<SimilarQuestion>? similar;
+  final bool failed;
+  final bool checking;
+  final ValueChanged<QuestionBankRow>? onEdit;
+
+  @override
+  State<_SimilarQuestionsPanel> createState() => _SimilarQuestionsPanelState();
+}
+
+class _SimilarQuestionsPanelState extends State<_SimilarQuestionsPanel> {
+  final _expanded = <int>{};
+
+  Widget _note(IconData icon, Color color, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final similar = widget.similar;
+    if (widget.checking && similar == null) {
+      return _note(
+        Icons.manage_search_rounded,
+        Theme.of(context).colorScheme.onSurfaceVariant,
+        'Buscando preguntas parecidas...',
+      );
+    }
+    if (widget.failed) {
+      return _note(
+        Icons.cloud_off_rounded,
+        BrandColors.warning,
+        'No se pudo comprobar si hay preguntas parecidas',
+      );
+    }
+    if (similar == null) return const SizedBox.shrink();
+    if (similar.isEmpty) {
+      return _note(
+        Icons.check_circle_outline_rounded,
+        BrandColors.success,
+        'No hay preguntas parecidas',
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: BrandColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: BrandColors.warning.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _note(
+            Icons.warning_amber_rounded,
+            BrandColors.warning,
+            'Preguntas parecidas en el banco (${similar.length})',
+          ),
+          const SizedBox(height: 8),
+          for (final match in similar)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _similarItem(context, match),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _similarItem(BuildContext context, SimilarQuestion match) {
+    final question = match.row.question;
+    final expanded = _expanded.contains(match.row.id);
+    final correct = [
+      for (final option in question.options)
+        if (option.isCorrect) option.label,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    question.prompt,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    _similarPlace(match.row),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (correct.isNotEmpty)
+                    Text(
+                      'Correcta: ${correct.join(' / ')}',
+                      style: const TextStyle(
+                        color: BrandColors.success,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _StatusPill(
+              label: '${match.percent} % parecida',
+              color: BrandColors.warning,
+            ),
+          ],
+        ),
+        Wrap(
+          spacing: 4,
+          children: [
+            TextButton(
+              onPressed: () => setState(() {
+                if (!_expanded.remove(match.row.id)) {
+                  _expanded.add(match.row.id);
+                }
+              }),
+              child: Text(expanded ? 'Ocultar' : 'Ver'),
+            ),
+            if (widget.onEdit != null)
+              TextButton(
+                onPressed: () => widget.onEdit!(match.row),
+                child: const Text('Editar esa pregunta'),
+              ),
+          ],
+        ),
+        if (expanded)
+          for (final option in question.options)
+            Padding(
+              padding: const EdgeInsets.only(left: 8, bottom: 2),
+              child: Row(
+                children: [
+                  Icon(
+                    option.isCorrect
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 16,
+                    color: option.isCorrect ? BrandColors.success : null,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(option.label)),
+                ],
+              ),
+            ),
+      ],
     );
   }
 }

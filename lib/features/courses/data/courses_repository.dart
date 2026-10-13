@@ -139,4 +139,26 @@ class CoursesRepository {
         )
         as Map<String, dynamic>,
   );
+
+  /// Existing questions similar to [prompt] in every course (courses.manage).
+  Future<List<SimilarQuestion>> findSimilarQuestions(
+    String prompt, {
+    int? excludeId,
+    int? limit,
+  }) async {
+    final json =
+        await _api.get(
+              '/questions/similar',
+              query: {
+                'prompt': prompt.trim(),
+                if (excludeId != null) 'exclude_id': '$excludeId',
+                if (limit != null) 'limit': '$limit',
+              },
+            )
+            as List;
+    return [
+      for (final item in json)
+        SimilarQuestion.fromJson(item as Map<String, dynamic>),
+    ];
+  }
 }
