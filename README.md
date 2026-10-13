@@ -4,6 +4,15 @@ Herramienta web interna para auditoria, supervision de personal y control operat
 
 La primera etapa web queda limitada a ocho modulos aprobados. No incluye modulos financieros, integraciones bancarias ni validacion de comprobantes.
 
+## Estado actual: v1.0.0
+
+Primera versión desplegable: inicio de sesión, 5 roles (Administrador, Supervisor, Auditor, Consulta gerencial, Alumno/Cobrador), **Usuarios** y **Cursos**. Los demás módulos están en el código pero ocultos en la navegación hasta su versión.
+
+- Despliegue: [docs/DEPLOY.md](docs/DEPLOY.md)
+- Notas de versión: [docs/releases/](docs/releases/)
+- Puertos: la app y la API se publican juntas en `WEB_PORT` (por defecto `8080`; la API en `/api`). Postgres y el backend no publican puertos. En desarrollo, `docker-compose.dev.yml` publica la API en `8000`.
+- Ramas y versiones: ver la skill `.claude/skills/colaboracion-desarrollo-despliegue/SKILL.md`.
+
 ## Documentacion
 
 - [Vision del proyecto](docs/project_overview.md)
