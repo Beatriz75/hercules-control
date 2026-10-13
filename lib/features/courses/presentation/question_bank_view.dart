@@ -598,7 +598,7 @@ class _BankGroupHeader extends StatelessWidget {
   }
 }
 
-class _BankQuestionCard extends StatelessWidget {
+class _BankQuestionCard extends StatefulWidget {
   const _BankQuestionCard({
     required this.row,
     required this.number,
@@ -612,7 +612,19 @@ class _BankQuestionCard extends StatelessWidget {
   final VoidCallback? onOpenCourse;
 
   @override
+  State<_BankQuestionCard> createState() => _BankQuestionCardState();
+}
+
+class _BankQuestionCardState extends State<_BankQuestionCard> {
+  /// Videos stay collapsed so long lists remain light.
+  var _showVideo = false;
+
+  @override
   Widget build(BuildContext context) {
+    final row = widget.row;
+    final number = widget.number;
+    final onEdit = widget.onEdit;
+    final onOpenCourse = widget.onOpenCourse;
     final colorScheme = Theme.of(context).colorScheme;
     final question = row.question;
     final imageUrl = question.imageUrl ?? '';
@@ -667,6 +679,7 @@ class _BankQuestionCard extends StatelessWidget {
                               ? 'Varias correctas'
                               : 'Una correcta',
                         ),
+                        if (question.hasVideo) const _VideoChip(),
                       ],
                     ),
                   ],
@@ -692,6 +705,20 @@ class _BankQuestionCard extends StatelessWidget {
               width: 240,
               child: _QuestionImage(url: imageUrl, height: 130),
             ),
+          ],
+          if (question.hasVideo) ...[
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: () => setState(() => _showVideo = !_showVideo),
+              icon: Icon(
+                _showVideo
+                    ? Icons.expand_less_rounded
+                    : Icons.smart_display_rounded,
+                size: 18,
+              ),
+              label: Text(_showVideo ? 'Ocultar video' : 'Ver video'),
+            ),
+            if (_showVideo) VideoEmbed(url: question.videoUrl!, maxWidth: 480),
           ],
           const SizedBox(height: 10),
           for (final option in question.options)

@@ -527,6 +527,10 @@ class _LessonTheoryDialogState extends State<_LessonTheoryDialog> {
                 ),
                 const SizedBox(height: 12),
                 _TheoryBlock(title: 'Contenido', body: lesson.theory),
+                if (lesson.theoryVideos.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _TheoryVideosBlock(videos: lesson.theoryVideos),
+                ],
                 if (lesson.theoryImageUrls.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   _TheoryImagesBlock(imageUrls: lesson.theoryImageUrls),

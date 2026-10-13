@@ -9,6 +9,8 @@ import 'package:hercules_control/core/theme/app_theme.dart';
 import 'package:hercules_control/core/widgets/app_panel.dart';
 import 'package:hercules_control/core/widgets/metric_card.dart';
 import 'package:hercules_control/core/widgets/page_header.dart';
+import 'package:hercules_control/core/widgets/video_embed.dart';
+import 'package:hercules_control/core/video/video_links.dart';
 import 'package:hercules_control/features/courses/data/course_models.dart';
 import 'package:hercules_control/features/courses/data/courses_repository.dart';
 import 'package:hercules_control/features/courses/data/question_bank.dart';

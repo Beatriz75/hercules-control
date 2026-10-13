@@ -107,6 +107,7 @@ Future<AuthController> _signIn(
           for (final index in [3, 1])
             {
               ..._question(lessonId, index),
+              if (index == 3) 'video_url': 'https://youtu.be/dQw4w9WgXcQ',
               'options': [
                 for (final option
                     in (_question(lessonId, index)['options'] as List).reversed)
@@ -267,6 +268,14 @@ void main() {
       {'lesson_id': 11},
     ]);
     expect(find.text('Pregunta 1 de 2'), findsOneWidget);
+    // The first drawn question has a video: 3 minutes instead of 60 s.
+    expect(
+      find.text(
+        'Pregunta con video: tienes 3 minutos · Tiempo restante: 3:00 min',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Abrir video'), findsOneWidget);
 
     // Can't advance without answering.
     final next = find.widgetWithText(FilledButton, 'Siguiente pregunta');
@@ -374,6 +383,22 @@ void main() {
     expect(find.text('Guardar curso'), findsOneWidget);
     expect(
       find.text('Banco: 3 preguntas. Cada práctica toma 3 al azar.'),
+      findsOneWidget,
+    );
+
+    // A bad question video link is rejected inline.
+    final videoField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText ==
+              'Enlace de YouTube, Google Drive, Vimeo o .mp4 / .webm',
+    );
+    await tester.enterText(videoField.first, 'https://example.com/clase');
+    await tester.pump();
+    expect(
+      find.text(
+        'El video debe ser un enlace de YouTube, Google Drive, Vimeo o un archivo .mp4 / .webm.',
+      ),
       findsOneWidget,
     );
 

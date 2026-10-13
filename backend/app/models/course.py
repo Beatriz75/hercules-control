@@ -68,6 +68,11 @@ class CourseLesson(Base):
         cascade="all, delete-orphan",
         order_by="CourseLessonTheoryImage.sort_order",
     )
+    theory_videos: Mapped[list["CourseLessonTheoryVideo"]] = relationship(
+        back_populates="lesson",
+        cascade="all, delete-orphan",
+        order_by="CourseLessonTheoryVideo.sort_order",
+    )
     questions: Mapped[list["TrainingQuestion"]] = relationship(
         back_populates="lesson",
         cascade="all, delete-orphan",
@@ -88,6 +93,20 @@ class CourseLessonTheoryImage(Base):
     lesson: Mapped[CourseLesson] = relationship(back_populates="theory_images")
 
 
+class CourseLessonTheoryVideo(Base):
+    __tablename__ = "course_lesson_theory_videos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lesson_id: Mapped[int] = mapped_column(
+        ForeignKey("course_lessons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    url: Mapped[str] = mapped_column(Text(), nullable=False)
+    title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    lesson: Mapped[CourseLesson] = relationship(back_populates="theory_videos")
+
+
 class TrainingQuestion(Base):
     __tablename__ = "training_questions"
     __table_args__ = (UniqueConstraint("lesson_id", "sort_order", name="uq_training_questions_lesson_sort_order"),)
@@ -100,6 +119,7 @@ class TrainingQuestion(Base):
     question_type: Mapped[str] = mapped_column(String(20), nullable=False, server_default="text")
     answer_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="single")
     image_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    video_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean(), nullable=False, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -20,6 +20,9 @@ class _PracticeDialog extends StatefulWidget {
 class _PracticeDialogState extends State<_PracticeDialog> {
   static const _questionDurationSeconds = 60;
 
+  /// Questions with a video get 3 minutes to watch it and answer.
+  static const _videoQuestionDurationSeconds = 180;
+
   PracticeSession? _session;
   var _starting = true;
   String? _startError;
@@ -80,7 +83,10 @@ class _PracticeDialogState extends State<_PracticeDialog> {
   }
 
   List<PracticeQuestion> get _questions => _session?.questions ?? const [];
-  double get _timerProgress => _questionSecondsLeft / _questionDurationSeconds;
+  int get _currentDuration => _questions.isNotEmpty && _currentQuestion.hasVideo
+      ? _videoQuestionDurationSeconds
+      : _questionDurationSeconds;
+  double get _timerProgress => _questionSecondsLeft / _currentDuration;
   bool get _isLastQuestion => _currentQuestionIndex == _questions.length - 1;
   bool get _timeUp => _questionSecondsLeft == 0;
 
@@ -93,7 +99,7 @@ class _PracticeDialogState extends State<_PracticeDialog> {
 
   void _startQuestionTimer() {
     _questionTimer?.cancel();
-    _questionSecondsLeft = _questionDurationSeconds;
+    _questionSecondsLeft = _currentDuration;
     _questionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
       if (_result != null || _submitting) {
@@ -346,6 +352,7 @@ class _PracticeDialogState extends State<_PracticeDialog> {
       _QuestionTimerBar(
         secondsLeft: _questionSecondsLeft,
         progress: _timerProgress,
+        hasVideo: _currentQuestion.hasVideo,
       ),
       const SizedBox(height: 16),
       _PracticeQuestionCard(
@@ -530,10 +537,21 @@ String _practiceDescription(Lesson lesson) {
 }
 
 class _QuestionTimerBar extends StatelessWidget {
-  const _QuestionTimerBar({required this.secondsLeft, required this.progress});
+  const _QuestionTimerBar({
+    required this.secondsLeft,
+    required this.progress,
+    this.hasVideo = false,
+  });
 
   final int secondsLeft;
   final double progress;
+  final bool hasVideo;
+
+  String get _remaining {
+    if (secondsLeft < 60) return '${secondsLeft}s';
+    final seconds = (secondsLeft % 60).toString().padLeft(2, '0');
+    return '${secondsLeft ~/ 60}:$seconds min';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -559,7 +577,9 @@ class _QuestionTimerBar extends StatelessWidget {
                 child: Text(
                   secondsLeft == 0
                       ? 'Tiempo agotado'
-                      : 'Tiempo restante: ${secondsLeft}s',
+                      : hasVideo
+                      ? 'Pregunta con video: tienes 3 minutos · Tiempo restante: $_remaining'
+                      : 'Tiempo restante: $_remaining',
                   style: TextStyle(color: color, fontWeight: FontWeight.w800),
                 ),
               ),
@@ -618,6 +638,10 @@ class _PracticeQuestionCard extends StatelessWidget {
               _QuestionImage(url: question.imageUrl!)
             else
               const _StatusPill(label: 'Pregunta con foto pendiente'),
+          ],
+          if (question.hasVideo) ...[
+            const SizedBox(height: 10),
+            VideoEmbed(url: question.videoUrl!, maxWidth: 560),
           ],
           const SizedBox(height: 10),
           Text(

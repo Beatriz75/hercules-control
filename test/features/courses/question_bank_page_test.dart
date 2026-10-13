@@ -91,7 +91,7 @@ Future<AuthController> _signIn(
     }
     if (path.endsWith('/questions')) {
       return _json([
-        bankRowJson(id: 1),
+        bankRowJson(id: 1, videoUrl: 'https://youtu.be/dQw4w9WgXcQ'),
         bankRowJson(
           id: 2,
           prompt: 'Pago en OXXO',
@@ -159,6 +159,14 @@ void main() {
     expect(find.text('Pago en OXXO'), findsOneWidget);
     expect(find.text('Editar'), findsNothing);
     expect(find.text('Nueva pregunta'), findsNothing);
+
+    // Video chip, collapsed until "Ver video".
+    expect(find.text('Video'), findsOneWidget);
+    expect(find.text('Abrir video'), findsNothing);
+    await tester.tap(find.text('Ver video'));
+    await tester.pump();
+    expect(find.text('Ocultar video'), findsOneWidget);
+    expect(find.text('Abrir video'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle_rounded), findsNWidgets(2));
 
     await tester.enterText(
@@ -290,13 +298,14 @@ void main() {
       await tester.tap(find.text('Lección 2: Transferencias').last);
       await _settle(tester);
 
-      final fields = find.descendant(
+      // Fields in the card: video link, question text, option 1, option 2.
+    final fields = find.descendant(
         of: find.byType(Dialog),
         matching: find.byType(TextFormField),
       );
-      await tester.enterText(fields.at(0), 'Pregunta nueva');
-      await tester.enterText(fields.at(1), 'Sí');
-      await tester.enterText(fields.at(2), 'No');
+      await tester.enterText(fields.at(1), 'Pregunta nueva');
+      await tester.enterText(fields.at(2), 'Sí');
+      await tester.enterText(fields.at(3), 'No');
       await tester.pump();
       await tester.tap(find.text('Guardar y agregar otra'));
       await _settle(tester);
@@ -316,7 +325,7 @@ void main() {
       // Dialog stays open with the same lesson and an empty question.
       expect(find.text('Nueva pregunta'), findsWidgets);
       expect(find.text('Lección 2: Transferencias'), findsOneWidget);
-      expect(tester.widget<TextFormField>(fields.at(0)).initialValue, '');
+      expect(tester.widget<TextFormField>(fields.at(1)).initialValue, '');
 
       await tester.tap(find.text('Cancelar').last);
       await _settle(tester);

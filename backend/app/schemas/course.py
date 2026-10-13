@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.video import validate_video_url
+
 
 def _duplicate_sort_orders(items: list) -> bool:
     sort_orders = [item.sort_order for item in items]
@@ -24,8 +26,14 @@ class TrainingQuestionCreate(BaseModel):
     question_type: Literal["text", "image"] = "text"
     answer_mode: Literal["single", "multiple"] = "single"
     image_url: str | None = None
+    video_url: str | None = Field(default=None, max_length=2000)
     sort_order: int = Field(ge=1)
     options: list[TrainingQuestionOptionCreate] = Field(min_length=2)
+
+    @field_validator("video_url")
+    @classmethod
+    def check_video(cls, value: str | None) -> str | None:
+        return validate_video_url(value)
 
     @model_validator(mode="after")
     def validate_options(self) -> "TrainingQuestionCreate":
@@ -45,6 +53,17 @@ class CourseLessonTheoryImageCreate(BaseModel):
     sort_order: int = Field(ge=1)
 
 
+class CourseLessonTheoryVideoCreate(BaseModel):
+    url: str = Field(min_length=1, max_length=2000)
+    title: str | None = Field(default=None, max_length=160)
+    sort_order: int = Field(ge=1)
+
+    @field_validator("url")
+    @classmethod
+    def check_video(cls, value: str) -> str:
+        return validate_video_url(value) or value
+
+
 class CourseLessonCreate(BaseModel):
     id: int | None = None
     title: str = Field(min_length=1, max_length=160)
@@ -54,6 +73,7 @@ class CourseLessonCreate(BaseModel):
     questions_per_attempt: int | None = Field(default=None, ge=1)
     sort_order: int = Field(ge=1)
     theory_images: list[CourseLessonTheoryImageCreate] = Field(default_factory=list)
+    theory_videos: list[CourseLessonTheoryVideoCreate] = Field(default_factory=list)
     questions: list[TrainingQuestionCreate] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -62,6 +82,8 @@ class CourseLessonCreate(BaseModel):
             raise ValueError("El orden de las preguntas no puede repetirse.")
         if _duplicate_sort_orders(self.theory_images):
             raise ValueError("El orden de las imágenes no puede repetirse.")
+        if _duplicate_sort_orders(self.theory_videos):
+            raise ValueError("El orden de los videos no puede repetirse.")
         if self.questions_per_attempt is not None and self.questions_per_attempt > len(self.questions):
             raise ValueError(
                 f"La lección \"{self.title}\" pide {self.questions_per_attempt} preguntas por práctica "
@@ -112,11 +134,21 @@ class TrainingQuestionRead(BaseModel):
     question_type: str
     answer_mode: str
     image_url: str | None
+    video_url: str | None
     sort_order: int
     active: bool
     created_at: datetime
     updated_at: datetime
     options: list[TrainingQuestionOptionRead]
+
+
+class CourseLessonTheoryVideoRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    url: str
+    title: str | None
+    sort_order: int
 
 
 class CourseLessonTheoryImageRead(BaseModel):
@@ -142,6 +174,7 @@ class CourseLessonRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     theory_images: list[CourseLessonTheoryImageRead]
+    theory_videos: list[CourseLessonTheoryVideoRead]
     questions: list[TrainingQuestionRead]
 
     @field_validator("questions")
@@ -196,6 +229,7 @@ class StudentQuestionRead(BaseModel):
     question_type: str
     answer_mode: str
     image_url: str | None
+    video_url: str | None
     sort_order: int
     options: list[StudentQuestionOptionRead]
 
@@ -211,6 +245,7 @@ class StudentLessonRead(BaseModel):
     required_approval_percent: int
     sort_order: int
     theory_images: list[CourseLessonTheoryImageRead]
+    theory_videos: list[CourseLessonTheoryVideoRead]
     question_bank_size: int
     questions_per_attempt: int
 
@@ -260,6 +295,7 @@ class QuestionBankRow(BaseModel):
     question_type: str
     answer_mode: str
     image_url: str | None
+    video_url: str | None
     sort_order: int
     options: list[TrainingQuestionOptionRead]
     lesson_id: int

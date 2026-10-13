@@ -10,12 +10,14 @@ Map<String, dynamic> bankRowJson({
   int courseId = 1,
   List<String> stores = const ['Ofertas'],
   List<String> labels = const ['Revisar en Banxico', 'Aceptarlo'],
+  String? videoUrl,
 }) => {
   'id': id,
   'prompt': prompt,
   'question_type': 'text',
   'answer_mode': answerMode,
   'image_url': null,
+  'video_url': videoUrl,
   'sort_order': 3,
   'options': [
     for (final label in labels.indexed)

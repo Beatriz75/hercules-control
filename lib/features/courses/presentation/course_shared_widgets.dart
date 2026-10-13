@@ -420,6 +420,7 @@ class _RoadmapStep extends StatelessWidget {
                       label: 'Aprueba con ${lesson.requiredApprovalPercent}%',
                     ),
                     _StatusPill(label: _bankLabel(lesson)),
+                    if (lesson.hasVideo) const _VideoChip(),
                   ],
                 )
               else
@@ -662,6 +663,10 @@ class _LessonPreviewDialog extends StatelessWidget {
                 Text(lesson.summary),
                 const SizedBox(height: 16),
                 _TheoryBlock(title: 'Teoría', body: lesson.theory),
+                if (lesson.theoryVideos.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _TheoryVideosBlock(videos: lesson.theoryVideos),
+                ],
                 if (lesson.theoryImageUrls.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   _TheoryImagesBlock(imageUrls: lesson.theoryImageUrls),
@@ -687,6 +692,12 @@ class _LessonPreviewDialog extends StatelessWidget {
                           '${question.$1 + 1}. ${question.$2.prompt}',
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
+                        if (question.$2.hasVideo) ...[
+                          const SizedBox(height: 6),
+                          const _VideoChip(),
+                          const SizedBox(height: 8),
+                          VideoEmbed(url: question.$2.videoUrl!, maxWidth: 480),
+                        ],
                         if (question.$2.type == QuestionType.image &&
                             (question.$2.imageUrl ?? '').isNotEmpty) ...[
                           const SizedBox(height: 8),
@@ -1022,4 +1033,51 @@ String _bankLabel(Lesson lesson) =>
 
 void _showSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// Theory videos of a lesson, each with its optional title.
+class _TheoryVideosBlock extends StatelessWidget {
+  const _TheoryVideosBlock({required this.videos});
+
+  final List<TheoryVideo> videos;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            videos.length == 1 ? 'Video' : 'Videos',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          for (final video in videos.indexed) ...[
+            VideoEmbed(url: video.$2.url, title: video.$2.title),
+            if (video.$1 != videos.length - 1) const SizedBox(height: 14),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoChip extends StatelessWidget {
+  const _VideoChip();
+
+  @override
+  Widget build(BuildContext context) => _StatusPill(
+    label: 'Video',
+    color: Theme.of(context).colorScheme.tertiary,
+  );
 }

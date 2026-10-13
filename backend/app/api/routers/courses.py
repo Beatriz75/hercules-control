@@ -11,6 +11,7 @@ from app.models.course import (
     Course,
     CourseLesson,
     CourseLessonTheoryImage,
+    CourseLessonTheoryVideo,
     CourseStore,
     TrainingQuestion,
     TrainingQuestionOption,
@@ -38,6 +39,7 @@ ProgressViewer = Annotated[User, Depends(require_permission(Permission.COURSES_P
 _COURSE_LOAD_OPTIONS = (
     selectinload(Course.stores),
     selectinload(Course.lessons).selectinload(CourseLesson.theory_images),
+    selectinload(Course.lessons).selectinload(CourseLesson.theory_videos),
     selectinload(Course.lessons).selectinload(CourseLesson.questions).selectinload(TrainingQuestion.options),
 )
 
@@ -63,12 +65,17 @@ def _build_lessons(payload: CourseCreate) -> list[CourseLesson]:
                 CourseLessonTheoryImage(url=image.url, sort_order=image.sort_order)
                 for image in lesson.theory_images
             ],
+            theory_videos=[
+                CourseLessonTheoryVideo(url=video.url, title=video.title, sort_order=video.sort_order)
+                for video in lesson.theory_videos
+            ],
             questions=[
                 TrainingQuestion(
                     prompt=question.prompt,
                     question_type=question.question_type,
                     answer_mode=question.answer_mode,
                     image_url=question.image_url,
+                    video_url=question.video_url,
                     sort_order=question.sort_order,
                     active=True,
                     options=[
@@ -171,6 +178,7 @@ def list_assigned_courses(student: CourseStudent, db: Session = Depends(get_db))
                     required_approval_percent=lesson.required_approval_percent,
                     sort_order=lesson.sort_order,
                     theory_images=lesson.theory_images,
+                    theory_videos=lesson.theory_videos,
                     question_bank_size=bank_size,
                     questions_per_attempt=practice_size(lesson.questions_per_attempt, bank_size),
                 )
@@ -225,6 +233,7 @@ def _new_question(payload: TrainingQuestionCreate) -> TrainingQuestion:
         question_type=payload.question_type,
         answer_mode=payload.answer_mode,
         image_url=payload.image_url,
+        video_url=payload.video_url,
         sort_order=payload.sort_order,
         active=True,
         options=[
@@ -259,6 +268,7 @@ def _apply_question(
     question.question_type = payload.question_type
     question.answer_mode = payload.answer_mode
     question.image_url = payload.image_url
+    question.video_url = payload.video_url
     question.active = True
     for option_id in removed_ids:
         question.options.remove(existing_options[option_id])
@@ -288,6 +298,10 @@ def _apply_lesson(db: Session, lesson: CourseLesson, payload: CourseLessonCreate
     lesson.active = True
     lesson.theory_images = [
         CourseLessonTheoryImage(url=image.url, sort_order=image.sort_order) for image in payload.theory_images
+    ]
+    lesson.theory_videos = [
+        CourseLessonTheoryVideo(url=video.url, title=video.title, sort_order=video.sort_order)
+        for video in payload.theory_videos
     ]
 
     existing_questions = {question.id: question for question in lesson.questions}

@@ -679,6 +679,18 @@ class _CourseTemplateEditorDialogState
                                     ),
                                   ],
                                 ),
+                                const SizedBox(height: 16),
+                                _TheoryVideosEditor(
+                                  key: ValueKey(
+                                    'theory-videos-$_selectedLessonIndex',
+                                  ),
+                                  videos: _selectedLesson.theoryVideos,
+                                  onChanged: (videos) => _replaceSelectedLesson(
+                                    _selectedLesson.copyWith(
+                                      theoryVideos: videos,
+                                    ),
+                                  ),
+                                ),
                                 const SizedBox(height: 12),
                                 Wrap(
                                   spacing: 16,
@@ -1276,6 +1288,28 @@ class _QuestionEditorCard extends StatelessWidget {
             ],
           ],
           const SizedBox(height: 12),
+          const _EditorFieldLabel('Video de la pregunta (opcional)'),
+          const SizedBox(height: 6),
+          TextFormField(
+            initialValue: question.videoUrl ?? '',
+            decoration: fieldDecoration().copyWith(
+              hintText: 'Enlace de YouTube, Google Drive, Vimeo o .mp4 / .webm',
+              prefixIcon: const Icon(Icons.smart_display_rounded),
+              errorMaxLines: 2,
+            ),
+            validator: validateVideoUrl,
+            onChanged: (value) => onChanged(
+              value.trim().isEmpty
+                  ? question.copyWith(clearVideoUrl: true)
+                  : question.copyWith(videoUrl: value.trim()),
+            ),
+          ),
+          if (question.hasVideo &&
+              validateVideoUrl(question.videoUrl) == null) ...[
+            const SizedBox(height: 8),
+            VideoEmbed(url: question.videoUrl!, maxWidth: 360),
+          ],
+          const SizedBox(height: 12),
           const _EditorFieldLabel('Tipo de respuesta'),
           const SizedBox(height: 6),
           DropdownButtonFormField<AnswerMode>(
@@ -1467,6 +1501,157 @@ class _OptionTruthPill extends StatelessWidget {
           fontSize: 12,
         ),
       ),
+    );
+  }
+}
+
+/// "Videos de teoría" of a lesson: add, remove, reorder, link + optional
+/// title, inline validation and a small preview.
+class _TheoryVideosEditor extends StatefulWidget {
+  const _TheoryVideosEditor({
+    super.key,
+    required this.videos,
+    required this.onChanged,
+  });
+
+  final List<TheoryVideo> videos;
+  final ValueChanged<List<TheoryVideo>> onChanged;
+
+  @override
+  State<_TheoryVideosEditor> createState() => _TheoryVideosEditorState();
+}
+
+class _TheoryVideosEditorState extends State<_TheoryVideosEditor> {
+  /// Bumped on structural changes so the text fields are rebuilt.
+  var _generation = 0;
+
+  void _update(List<TheoryVideo> videos, {bool structural = false}) {
+    if (structural) setState(() => _generation++);
+    widget.onChanged(videos);
+  }
+
+  void _move(int index, int direction) {
+    final videos = [...widget.videos];
+    final video = videos.removeAt(index);
+    videos.insert(index + direction, video);
+    _update(videos, structural: true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final videos = widget.videos;
+
+    InputDecoration decoration(String label, {String? hint}) => InputDecoration(
+      labelText: label,
+      hintText: hint,
+      filled: true,
+      fillColor: colorScheme.surface,
+      border: const OutlineInputBorder(),
+      errorMaxLines: 2,
+      isDense: true,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _EditorFieldLabel('Videos de teoría'),
+        const SizedBox(height: 6),
+        if (videos.isEmpty) const Text('Esta lección no tiene videos.'),
+        for (final video in videos.indexed)
+          Container(
+            key: ValueKey('theory-video-$_generation-${video.$1}'),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextFormField(
+                        initialValue: video.$2.url,
+                        decoration: decoration(
+                          'Enlace del video',
+                          hint: 'YouTube, Google Drive, Vimeo o .mp4 / .webm',
+                        ),
+                        validator: (value) => (value ?? '').trim().isEmpty
+                            ? 'Pega el enlace del video.'
+                            : validateVideoUrl(value),
+                        onChanged: (value) {
+                          final updated = [...videos];
+                          updated[video.$1] = video.$2.copyWith(url: value);
+                          _update(updated);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: TextFormField(
+                        initialValue: video.$2.title ?? '',
+                        decoration: decoration('Título (opcional)'),
+                        validator: validateVideoTitle,
+                        onChanged: (value) {
+                          final updated = [...videos];
+                          updated[video.$1] = TheoryVideo(
+                            url: video.$2.url,
+                            title: value,
+                          );
+                          _update(updated);
+                        },
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: video.$1 > 0
+                          ? () => _move(video.$1, -1)
+                          : null,
+                      icon: const Icon(Icons.arrow_upward_rounded),
+                      tooltip: 'Subir video',
+                    ),
+                    IconButton(
+                      onPressed: video.$1 < videos.length - 1
+                          ? () => _move(video.$1, 1)
+                          : null,
+                      icon: const Icon(Icons.arrow_downward_rounded),
+                      tooltip: 'Bajar video',
+                    ),
+                    IconButton(
+                      onPressed: () => _update(
+                        [...videos]..removeAt(video.$1),
+                        structural: true,
+                      ),
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      tooltip: 'Quitar video',
+                    ),
+                  ],
+                ),
+                if (video.$2.url.trim().isNotEmpty &&
+                    validateVideoUrl(video.$2.url) == null) ...[
+                  const SizedBox(height: 8),
+                  VideoEmbed(url: video.$2.url, maxWidth: 360),
+                ],
+              ],
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: () => _update([
+              ...videos,
+              const TheoryVideo(url: ''),
+            ], structural: true),
+            icon: const Icon(Icons.video_call_rounded),
+            label: const Text('Agregar video'),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -6,6 +6,8 @@
 /// questions and options in place and preserves student progress.
 library;
 
+import 'package:hercules_control/core/video/video_links.dart';
+
 enum CourseStatus {
   draft('draft', 'Borrador'),
   active('active', 'Publicado'),
@@ -121,6 +123,7 @@ class PracticeQuestion {
     this.type = QuestionType.text,
     this.answerMode = AnswerMode.single,
     this.imageUrl,
+    this.videoUrl,
   });
 
   factory PracticeQuestion.blank() => const PracticeQuestion(
@@ -149,6 +152,7 @@ class PracticeQuestion {
       type: QuestionType.fromCode(json['question_type'] as String?),
       answerMode: AnswerMode.fromCode(json['answer_mode'] as String?),
       imageUrl: json['image_url'] as String?,
+      videoUrl: _emptyToNull(json['video_url'] as String?),
       options: [for (final option in options) QuestionOption.fromJson(option)],
     );
   }
@@ -159,6 +163,11 @@ class PracticeQuestion {
   final QuestionType type;
   final AnswerMode answerMode;
   final String? imageUrl;
+
+  /// Optional video link (YouTube, Drive, Vimeo, .mp4/.webm).
+  final String? videoUrl;
+
+  bool get hasVideo => (videoUrl ?? '').trim().isNotEmpty;
 
   List<int> get correctOptionIndexes => [
     for (final option in options.indexed)
@@ -174,6 +183,8 @@ class PracticeQuestion {
     AnswerMode? answerMode,
     String? imageUrl,
     bool clearImageUrl = false,
+    String? videoUrl,
+    bool clearVideoUrl = false,
   }) {
     return PracticeQuestion(
       id: id,
@@ -182,6 +193,7 @@ class PracticeQuestion {
       type: type ?? this.type,
       answerMode: answerMode ?? this.answerMode,
       imageUrl: clearImageUrl ? null : imageUrl ?? this.imageUrl,
+      videoUrl: clearVideoUrl ? null : videoUrl ?? this.videoUrl,
     );
   }
 
@@ -193,6 +205,7 @@ class PracticeQuestion {
       type: type,
       answerMode: answerMode,
       imageUrl: imageUrl,
+      videoUrl: videoUrl,
       options: [for (final option in options) option.copyWith(clearId: true)],
     );
   }
@@ -203,10 +216,33 @@ class PracticeQuestion {
     'question_type': type.code,
     'answer_mode': answerMode.code,
     'image_url': type == QuestionType.image ? _emptyToNull(imageUrl) : null,
+    'video_url': _emptyToNull(videoUrl?.trim()),
     'sort_order': sortOrder,
     'options': [
       for (final option in options.indexed) option.$2.toPayload(option.$1 + 1),
     ],
+  };
+}
+
+/// Video shown in a lesson's theory.
+class TheoryVideo {
+  const TheoryVideo({required this.url, this.title});
+
+  factory TheoryVideo.fromJson(Map<String, dynamic> json) => TheoryVideo(
+    url: (json['url'] as String?) ?? '',
+    title: _emptyToNull(json['title'] as String?),
+  );
+
+  final String url;
+  final String? title;
+
+  TheoryVideo copyWith({String? url, String? title}) =>
+      TheoryVideo(url: url ?? this.url, title: title ?? this.title);
+
+  Map<String, dynamic> toPayload(int sortOrder) => {
+    'url': url.trim(),
+    'title': _emptyToNull(title?.trim()),
+    'sort_order': sortOrder,
   };
 }
 
@@ -218,6 +254,7 @@ class Lesson {
     required this.theory,
     required this.questions,
     this.theoryImageUrls = const [],
+    this.theoryVideos = const [],
     this.requiredApprovalPercent = 80,
     this.questionsPerAttempt,
     this.questionBankSize,
@@ -253,6 +290,10 @@ class Lesson {
         for (final image in _sortedMaps(json['theory_images']))
           (image['url'] as String?) ?? '',
       ],
+      theoryVideos: [
+        for (final video in _sortedMaps(json['theory_videos']))
+          TheoryVideo.fromJson(video),
+      ],
       questions: [
         for (final question in _sortedMaps(json['questions']))
           PracticeQuestion.fromJson(question),
@@ -266,7 +307,12 @@ class Lesson {
   final String theory;
   final List<PracticeQuestion> questions;
   final List<String> theoryImageUrls;
+  final List<TheoryVideo> theoryVideos;
   final int requiredApprovalPercent;
+
+  /// Whether the lesson has a theory video or a question with video.
+  bool get hasVideo =>
+      theoryVideos.isNotEmpty || questions.any((question) => question.hasVideo);
 
   /// Questions drawn at random for each practice. Null = the whole bank.
   /// For students the server already resolves it to a number.
@@ -290,6 +336,7 @@ class Lesson {
     String? theory,
     List<PracticeQuestion>? questions,
     List<String>? theoryImageUrls,
+    List<TheoryVideo>? theoryVideos,
     int? requiredApprovalPercent,
     int? questionsPerAttempt,
     bool clearQuestionsPerAttempt = false,
@@ -301,6 +348,7 @@ class Lesson {
       theory: theory ?? this.theory,
       questions: questions ?? this.questions,
       theoryImageUrls: theoryImageUrls ?? this.theoryImageUrls,
+      theoryVideos: theoryVideos ?? this.theoryVideos,
       requiredApprovalPercent:
           requiredApprovalPercent ?? this.requiredApprovalPercent,
       questionsPerAttempt: clearQuestionsPerAttempt
@@ -315,6 +363,10 @@ class Lesson {
       for (final url in theoryImageUrls)
         if (url.trim().isNotEmpty) url.trim(),
     ];
+    final videos = [
+      for (final video in theoryVideos)
+        if (video.url.trim().isNotEmpty) video,
+    ];
     return {
       'id': ?id,
       'title': title.trim(),
@@ -326,6 +378,9 @@ class Lesson {
       'theory_images': [
         for (final image in images.indexed)
           {'url': image.$2, 'sort_order': image.$1 + 1},
+      ],
+      'theory_videos': [
+        for (final video in videos.indexed) video.$2.toPayload(video.$1 + 1),
       ],
       'questions': [
         for (final question in questions.indexed)
@@ -452,6 +507,16 @@ class Course {
         l.questions.length,
       );
       if (perAttemptError != null) errors.add('Lección $n: $perAttemptError');
+      for (final video in l.theoryVideos.indexed) {
+        final label = 'Lección $n, video ${video.$1 + 1}';
+        if (video.$2.url.trim().isEmpty) {
+          errors.add('$label: falta el enlace del video.');
+        }
+        final urlError = validateVideoUrl(video.$2.url);
+        if (urlError != null) errors.add('$label: $urlError');
+        final titleError = validateVideoTitle(video.$2.title);
+        if (titleError != null) errors.add('$label: $titleError');
+      }
       for (final question in l.questions.indexed) {
         final label = 'Lección $n, pregunta ${question.$1 + 1}';
         for (final error in practiceQuestionErrors(question.$2)) {
@@ -468,6 +533,8 @@ List<String> practiceQuestionErrors(PracticeQuestion q) {
   final errors = <String>[];
   if (q.prompt.trim().isEmpty) errors.add('falta el enunciado.');
   if (q.options.length < 2) errors.add('necesita al menos 2 opciones.');
+  final videoError = validateVideoUrl(q.videoUrl);
+  if (videoError != null) errors.add(videoError);
   if (q.options.any((option) => option.label.trim().isEmpty)) {
     errors.add('hay opciones vacías.');
   }

@@ -436,4 +436,80 @@ void main() {
     expect(result.correctAnswers, 1);
     expect(result.approved, isFalse);
   });
+
+  test('theory_videos and video_url round-trip in the course payload', () {
+    final json = _courseReadJson();
+    final lesson20 =
+        (json['lessons'] as List).firstWhere((lesson) => lesson['id'] == 20)
+            as Map<String, dynamic>;
+    lesson20['theory_videos'] = [
+      {
+        'id': 2,
+        'url': 'https://vimeo.com/76979871',
+        'title': null,
+        'sort_order': 2,
+      },
+      {
+        'id': 1,
+        'url': 'https://youtu.be/dQw4w9WgXcQ',
+        'title': 'Intro',
+        'sort_order': 1,
+      },
+    ];
+    ((lesson20['questions'] as List).single as Map)['video_url'] =
+        'https://example.com/clase.mp4';
+
+    final course = Course.fromJson(json);
+    final lesson = course.lessons.first;
+    expect(lesson.theoryVideos.map((video) => video.url), [
+      'https://youtu.be/dQw4w9WgXcQ',
+      'https://vimeo.com/76979871',
+    ]);
+    expect(lesson.theoryVideos.first.title, 'Intro');
+    expect(lesson.questions.single.videoUrl, 'https://example.com/clase.mp4');
+    expect(lesson.hasVideo, isTrue);
+    expect(course.lessons[1].hasVideo, isFalse);
+
+    final lessons = course.toPayload()['lessons'] as List;
+    expect(lessons[0]['theory_videos'], [
+      {
+        'url': 'https://youtu.be/dQw4w9WgXcQ',
+        'title': 'Intro',
+        'sort_order': 1,
+      },
+      {'url': 'https://vimeo.com/76979871', 'title': null, 'sort_order': 2},
+    ]);
+    expect(
+      (lessons[0]['questions'] as List).single['video_url'],
+      'https://example.com/clase.mp4',
+    );
+    expect(lessons[1]['theory_videos'], isEmpty);
+    expect((lessons[1]['questions'] as List).single['video_url'], isNull);
+
+    // Empty video links are not sent and the moved copy keeps the video.
+    final cleared = lesson.questions.single.copyWith(clearVideoUrl: true);
+    expect(cleared.toPayload(1)['video_url'], isNull);
+    expect(lesson.questions.single.withoutIds().videoUrl, isNotNull);
+  });
+
+  test('bad video links block saving with lesson/question context', () {
+    final course = Course.fromJson(_courseReadJson());
+    final first = course.lessons.first;
+    final broken = course.copyWith(
+      lessons: [
+        first.copyWith(
+          theoryVideos: const [TheoryVideo(url: 'www.youtube.com/x')],
+          questions: [
+            first.questions.single.copyWith(videoUrl: 'https://example.com/a'),
+          ],
+        ),
+        course.lessons[1],
+      ],
+    );
+
+    expect(broken.validationErrors(), [
+      'Lección 1, video 1: El enlace del video debe empezar con http:// o https://.',
+      'Lección 1, pregunta 1: El video debe ser un enlace de YouTube, Google Drive, Vimeo o un archivo .mp4 / .webm.',
+    ]);
+  });
 }
