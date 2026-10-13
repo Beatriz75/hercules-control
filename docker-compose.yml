@@ -1,30 +1,56 @@
+# Hércules Control: Postgres + FastAPI + Flutter web (nginx).
+# Copy .env.example to .env and fill it in before `docker compose up -d --build`.
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: hercules_control
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-hercules_control}
+      POSTGRES_USER: ${POSTGRES_USER:-hercules}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d hercules_control"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
+    image: hercules-control-backend:${APP_VERSION:?Set APP_VERSION in .env}
     build:
       context: ./backend
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/hercules_control
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hercules}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hercules_control}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:?Set AUTH_SECRET_KEY in .env}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      ROOT_PATH: /api
+      INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-admin}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      INITIAL_ADMIN_FULL_NAME: ${INITIAL_ADMIN_FULL_NAME:-Administrador}
     depends_on:
       db:
         condition: service_healthy
+
+  web:
+    image: hercules-control-web:${APP_VERSION:?Set APP_VERSION in .env}
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null && wget -qO- http://127.0.0.1/api/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     ports:
-      - "8000:8000"
-    command: >
-      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:

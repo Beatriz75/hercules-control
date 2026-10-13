@@ -1,0 +1,15 @@
+.git/
+.dart_tool/
+.idea/
+.atl/
+.codegraph/
+build/
+backend/
+**/.venv/
+**/__pycache__/
+linux/
+macos/
+windows/
+docs/
+*.md
+.env
