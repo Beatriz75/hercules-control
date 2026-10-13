@@ -52,7 +52,7 @@ List<AppSection> _sections(Set<String> permissions) =>
 
 void main() {
   test('defines one base route for each approved module', () {
-    expect(appRoutes, hasLength(10));
+    expect(appRoutes, hasLength(11));
     expect(
       appRoutes.map((route) => route.path),
       containsAllInOrder([
@@ -61,6 +61,7 @@ void main() {
         '/candidates',
         '/audits',
         '/courses',
+        '/question-bank',
         '/performance',
         '/reports',
         '/whatsapp-lines',
@@ -77,20 +78,38 @@ void main() {
     );
   });
 
-  test('only Cursos and Usuarios are released in this delivery', () {
+  test('only Cursos, Banco de preguntas and Usuarios are released', () {
     expect(
       appRoutes.where((route) => route.enabled).map((route) => route.section),
-      [AppSection.courses, AppSection.users],
+      [AppSection.courses, AppSection.questionBank, AppSection.users],
     );
   });
 
-  test('administrator sees Cursos and Usuarios only', () {
-    expect(_sections(_admin), [AppSection.courses, AppSection.users]);
+  test('administrator sees Cursos, Banco de preguntas and Usuarios', () {
+    expect(_sections(_admin), [
+      AppSection.courses,
+      AppSection.questionBank,
+      AppSection.users,
+    ]);
   });
 
-  test('supervisor and consulta gerencial see only Cursos', () {
-    expect(_sections(_supervisor), [AppSection.courses]);
-    expect(_sections(_consultaGerencial), [AppSection.courses]);
+  test('supervisor and consulta gerencial see Cursos and the bank', () {
+    expect(_sections(_supervisor), [
+      AppSection.courses,
+      AppSection.questionBank,
+    ]);
+    expect(_sections(_consultaGerencial), [
+      AppSection.courses,
+      AppSection.questionBank,
+    ]);
+  });
+
+  test('question bank requires courses.view, not courses.take', () {
+    final bank = appRoutes.firstWhere(
+      (route) => route.section == AppSection.questionBank,
+    );
+    expect(bank.path, '/question-bank');
+    expect(bank.acceptedPermissions, ['courses.view']);
   });
 
   test('alumno reaches Cursos through courses.take', () {

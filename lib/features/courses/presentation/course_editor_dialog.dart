@@ -1007,8 +1007,30 @@ class _QuestionEditorCard extends StatelessWidget {
     required this.onMoveUp,
     required this.onMoveDown,
     required this.onRemove,
-  });
+  }) : standalone = false;
 
+  /// Edits a single question outside the course editor (question bank):
+  /// hides ordering, removal and the lesson picker.
+  const _QuestionEditorCard.standalone({
+    required this.question,
+    required this.onChanged,
+  }) : number = 1,
+       lessonIndex = 0,
+       lessons = const [],
+       canMoveUp = false,
+       canMoveDown = false,
+       canRemove = false,
+       canChangeLesson = false,
+       onLessonChanged = _ignoreInt,
+       onMoveUp = _noop,
+       onMoveDown = _noop,
+       onRemove = _noop,
+       standalone = true;
+
+  static void _ignoreInt(int _) {}
+  static void _noop() {}
+
+  final bool standalone;
   final int number;
   final PracticeQuestion question;
   final int lessonIndex;
@@ -1128,59 +1150,61 @@ class _QuestionEditorCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Lección ${lessonIndex + 1} · Pregunta $number',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          if (!standalone) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Lección ${lessonIndex + 1} · Pregunta $number',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-              ),
-              IconButton(
-                onPressed: canMoveUp ? onMoveUp : null,
-                icon: const Icon(Icons.arrow_upward_rounded),
-                tooltip: 'Subir pregunta',
-              ),
-              IconButton(
-                onPressed: canMoveDown ? onMoveDown : null,
-                icon: const Icon(Icons.arrow_downward_rounded),
-                tooltip: 'Bajar pregunta',
-              ),
-              IconButton(
-                onPressed: canRemove ? onRemove : null,
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: 'Eliminar pregunta',
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const _EditorFieldLabel('Lección asociada'),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<int>(
-            initialValue: lessonIndex,
-            decoration: fieldDecoration(),
-            items: [
-              for (final lesson in lessons.indexed)
-                DropdownMenuItem<int>(
-                  value: lesson.$1,
-                  child: Text('${lesson.$1 + 1}. ${lesson.$2.title}'),
+                IconButton(
+                  onPressed: canMoveUp ? onMoveUp : null,
+                  icon: const Icon(Icons.arrow_upward_rounded),
+                  tooltip: 'Subir pregunta',
                 ),
-            ],
-            onChanged: canChangeLesson
-                ? (value) {
-                    if (value != null) onLessonChanged(value);
-                  }
-                : null,
-          ),
-          if (!canChangeLesson) ...[
-            const SizedBox(height: 8),
-            const Text(
-              'Esta pregunta no se puede mover porque la sección quedaría sin preguntas.',
+                IconButton(
+                  onPressed: canMoveDown ? onMoveDown : null,
+                  icon: const Icon(Icons.arrow_downward_rounded),
+                  tooltip: 'Bajar pregunta',
+                ),
+                IconButton(
+                  onPressed: canRemove ? onRemove : null,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  tooltip: 'Eliminar pregunta',
+                ),
+              ],
             ),
+            const SizedBox(height: 12),
+            const _EditorFieldLabel('Lección asociada'),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<int>(
+              initialValue: lessonIndex,
+              decoration: fieldDecoration(),
+              items: [
+                for (final lesson in lessons.indexed)
+                  DropdownMenuItem<int>(
+                    value: lesson.$1,
+                    child: Text('${lesson.$1 + 1}. ${lesson.$2.title}'),
+                  ),
+              ],
+              onChanged: canChangeLesson
+                  ? (value) {
+                      if (value != null) onLessonChanged(value);
+                    }
+                  : null,
+            ),
+            if (!canChangeLesson) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Esta pregunta no se puede mover porque la sección quedaría sin preguntas.',
+              ),
+            ],
+            const SizedBox(height: 12),
           ],
-          const SizedBox(height: 12),
           const _EditorFieldLabel('Contenido visual de la pregunta'),
           const SizedBox(height: 6),
           DropdownButtonFormField<QuestionType>(

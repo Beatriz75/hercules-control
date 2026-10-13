@@ -4,6 +4,7 @@ enum AppSection {
   candidates,
   audits,
   courses,
+  questionBank,
   performance,
   reports,
   lines,

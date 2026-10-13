@@ -67,6 +67,13 @@ const appRoutes = [
     enabled: true,
   ),
   AppRouteDefinition(
+    section: AppSection.questionBank,
+    path: '/question-bank',
+    label: 'Banco de preguntas',
+    requiredPermission: 'courses.view',
+    enabled: true,
+  ),
+  AppRouteDefinition(
     section: AppSection.performance,
     path: '/performance',
     label: 'Rendimiento',

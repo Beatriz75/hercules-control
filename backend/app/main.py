@@ -8,6 +8,7 @@ from app.api.routers.courses import router as courses_router
 from app.api.routers.health import router as health_router
 from app.api.routers.lesson_progress import router as lesson_progress_router
 from app.api.routers.operational_audits import router as operational_audits_router
+from app.api.routers.questions import router as questions_router
 from app.api.routers.training_attempts import router as training_attempts_router
 from app.api.routers.users import router as users_router
 from app.core.config import get_settings, validate_settings
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(audit_templates_router)
     app.include_router(operational_audits_router)
     app.include_router(courses_router)
+    app.include_router(questions_router)
     app.include_router(training_attempts_router)
     app.include_router(lesson_progress_router)
     app.include_router(health_router)

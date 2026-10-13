@@ -11,6 +11,9 @@ import 'package:hercules_control/core/widgets/metric_card.dart';
 import 'package:hercules_control/core/widgets/page_header.dart';
 import 'package:hercules_control/features/courses/data/course_models.dart';
 import 'package:hercules_control/features/courses/data/courses_repository.dart';
+import 'package:hercules_control/features/courses/data/question_bank.dart';
+import 'package:hercules_control/app/navigation/app_section.dart';
+import 'package:hercules_control/app/navigation/shell_navigation.dart';
 import 'package:hercules_control/features/courses/presentation/clipboard_image_reader.dart';
 import 'package:intl/intl.dart';
 
@@ -20,11 +23,15 @@ part 'course_progress_view.dart';
 part 'course_shared_widgets.dart';
 part 'course_staff_view.dart';
 part 'course_student_view.dart';
+part 'question_bank_view.dart';
 
 /// Entry point of the Cursos module. Staff (courses.view) get the catalog,
 /// students (courses.take) get their assigned courses.
 class CoursesPage extends StatelessWidget {
-  const CoursesPage({super.key});
+  const CoursesPage({super.key, this.initialCourseId});
+
+  /// Course to select when opening the staff catalog (e.g. from the bank).
+  final int? initialCourseId;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +43,7 @@ class CoursesPage extends StatelessWidget {
         repository: repository,
         canManage: auth.can(Permissions.coursesManage),
         canViewProgress: auth.can(Permissions.coursesProgressView),
+        initialCourseId: initialCourseId,
       );
     }
     if (auth.can(Permissions.coursesTake)) {

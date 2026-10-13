@@ -7,7 +7,9 @@ void main() {
   test('uses a string detail as message', () {
     final error = ApiException.fromResponse(
       400,
-      jsonEncode({'detail': 'No puedes quitarte tu propio acceso de administrador.'}),
+      jsonEncode({
+        'detail': 'No puedes quitarte tu propio acceso de administrador.',
+      }),
     );
 
     expect(error.statusCode, 400);

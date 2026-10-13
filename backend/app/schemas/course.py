@@ -246,3 +246,27 @@ class PracticeSessionRead(BaseModel):
     lesson_id: int
     required_approval_percent: int
     questions: list[StudentQuestionRead]
+
+
+class QuestionUpdate(TrainingQuestionCreate):
+    """Body to edit one question from the general bank; sort_order is kept from the stored question."""
+
+    sort_order: int = Field(default=1, ge=1)
+
+
+class QuestionBankRow(BaseModel):
+    id: int
+    prompt: str
+    question_type: str
+    answer_mode: str
+    image_url: str | None
+    sort_order: int
+    options: list[TrainingQuestionOptionRead]
+    lesson_id: int
+    lesson_title: str
+    lesson_sort_order: int
+    course_id: int
+    course_title: str
+    course_status: str
+    course_active: bool
+    stores: list[str]

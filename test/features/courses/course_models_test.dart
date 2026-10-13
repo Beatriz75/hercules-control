@@ -257,9 +257,8 @@ void main() {
     final json = _courseReadJson();
     // Lesson 20 (sort_order 1) has a bank of one question.
     (json['lessons'] as List).firstWhere(
-          (lesson) => lesson['id'] == 20,
-        )['questions_per_attempt'] =
-        1;
+      (lesson) => lesson['id'] == 20,
+    )['questions_per_attempt'] = 1;
     final course = Course.fromJson(json);
 
     expect(course.lessons.first.questionsPerAttempt, 1);

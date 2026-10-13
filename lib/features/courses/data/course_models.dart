@@ -453,26 +453,32 @@ class Course {
       );
       if (perAttemptError != null) errors.add('Lección $n: $perAttemptError');
       for (final question in l.questions.indexed) {
-        final q = question.$2;
         final label = 'Lección $n, pregunta ${question.$1 + 1}';
-        if (q.prompt.trim().isEmpty) errors.add('$label: falta el enunciado.');
-        if (q.options.length < 2) {
-          errors.add('$label: necesita al menos 2 opciones.');
-        }
-        if (q.options.any((option) => option.label.trim().isEmpty)) {
-          errors.add('$label: hay opciones vacías.');
-        }
-        final correct = q.correctOptionIndexes.length;
-        if (q.answerMode == AnswerMode.single && correct != 1) {
-          errors.add('$label: marca exactamente una opción correcta.');
-        }
-        if (q.answerMode == AnswerMode.multiple && correct < 1) {
-          errors.add('$label: marca al menos una opción correcta.');
+        for (final error in practiceQuestionErrors(question.$2)) {
+          errors.add('$label: $error');
         }
       }
     }
     return errors;
   }
+}
+
+/// Checks of a single question (lower-case messages, to be prefixed).
+List<String> practiceQuestionErrors(PracticeQuestion q) {
+  final errors = <String>[];
+  if (q.prompt.trim().isEmpty) errors.add('falta el enunciado.');
+  if (q.options.length < 2) errors.add('necesita al menos 2 opciones.');
+  if (q.options.any((option) => option.label.trim().isEmpty)) {
+    errors.add('hay opciones vacías.');
+  }
+  final correct = q.correctOptionIndexes.length;
+  if (q.answerMode == AnswerMode.single && correct != 1) {
+    errors.add('marca exactamente una opción correcta.');
+  }
+  if (q.answerMode == AnswerMode.multiple && correct < 1) {
+    errors.add('marca al menos una opción correcta.');
+  }
+  return errors;
 }
 
 /// Validates "Preguntas por práctica" against the bank size (null = all).

@@ -7,11 +7,13 @@ class _StaffCoursesView extends StatefulWidget {
     required this.repository,
     required this.canManage,
     required this.canViewProgress,
+    this.initialCourseId,
   });
 
   final CoursesRepository repository;
   final bool canManage;
   final bool canViewProgress;
+  final int? initialCourseId;
 
   @override
   State<_StaffCoursesView> createState() => _StaffCoursesViewState();
@@ -31,6 +33,7 @@ class _StaffCoursesViewState extends State<_StaffCoursesView> {
   @override
   void initState() {
     super.initState();
+    _selectedCourseId = widget.initialCourseId;
     _load();
   }
 

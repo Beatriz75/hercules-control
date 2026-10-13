@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hercules_control/app/navigation/app_route.dart';
 import 'package:hercules_control/app/navigation/app_section.dart';
+import 'package:hercules_control/app/navigation/shell_navigation.dart';
 import 'package:hercules_control/core/auth/auth_scope.dart';
 import 'package:hercules_control/core/auth/current_user.dart';
 import 'package:hercules_control/core/theme/app_theme.dart';
@@ -26,6 +27,15 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   AppSection? _active;
+  int? _focusCourseId;
+
+  void _goTo(AppSection section, {int? courseId}) {
+    setState(() {
+      _active = section;
+      _focusCourseId = courseId;
+    });
+  }
+
   bool _collapsed = false;
 
   Widget _pageFor(AppSection section) {
@@ -34,7 +44,11 @@ class _AppShellState extends State<AppShell> {
       AppSection.employees => const EmployeesPage(),
       AppSection.candidates => const CandidatesPage(),
       AppSection.audits => const AuditsPage(),
-      AppSection.courses => const CoursesPage(),
+      AppSection.courses => CoursesPage(
+        key: ValueKey('courses-$_focusCourseId'),
+        initialCourseId: _focusCourseId,
+      ),
+      AppSection.questionBank => const QuestionBankPage(),
       AppSection.performance => const PerformancePage(),
       AppSection.reports => const ReportsPage(),
       AppSection.lines => const LinesPage(),
@@ -54,95 +68,99 @@ class _AppShellState extends State<AppShell> {
         ? null
         : routes.first.section;
 
-    return Scaffold(
-      body: Row(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            width: _collapsed ? 84 : 248,
-            color: BrandColors.navy,
-            child: SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      _collapsed ? 8 : 16,
-                      16,
-                      _collapsed ? 8 : 8,
-                      24,
-                    ),
-                    child: Flex(
-                      direction: _collapsed ? Axis.vertical : Axis.horizontal,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const BrandMark(size: 44),
-                        if (!_collapsed) ...[
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: BrandWordmark(
-                              fontSize: 17,
-                              titleColor: Colors.white,
+    return ShellNavigation(
+      goTo: _goTo,
+      child: Scaffold(
+        body: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: _collapsed ? 84 : 248,
+              color: BrandColors.navy,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        _collapsed ? 8 : 16,
+                        16,
+                        _collapsed ? 8 : 8,
+                        24,
+                      ),
+                      child: Flex(
+                        direction: _collapsed ? Axis.vertical : Axis.horizontal,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const BrandMark(size: 44),
+                          if (!_collapsed) ...[
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: BrandWordmark(
+                                fontSize: 17,
+                                titleColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _collapsed = !_collapsed;
+                              });
+                            },
+                            tooltip: _collapsed
+                                ? 'Expandir menú'
+                                : 'Contraer menú',
+                            icon: Icon(
+                              _collapsed
+                                  ? Icons.keyboard_double_arrow_right_rounded
+                                  : Icons.keyboard_double_arrow_left_rounded,
+                              color: Colors.white,
                             ),
                           ),
                         ],
-                        IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _collapsed = !_collapsed;
-                            });
-                          },
-                          tooltip: _collapsed
-                              ? 'Expandir menú'
-                              : 'Contraer menú',
-                          icon: Icon(
-                            _collapsed
-                                ? Icons.keyboard_double_arrow_right_rounded
-                                : Icons.keyboard_double_arrow_left_rounded,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      children: [
-                        for (final route in routes)
-                          _SidebarTile(
-                            collapsed: _collapsed,
-                            selected: active == route.section,
-                            icon: _iconForSection(route.section),
-                            label: route.label,
-                            onTap: () {
-                              setState(() {
-                                _active = route.section;
-                              });
-                            },
-                          ),
-                      ],
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        children: [
+                          for (final route in routes)
+                            _SidebarTile(
+                              collapsed: _collapsed,
+                              selected: active == route.section,
+                              icon: _iconForSection(route.section),
+                              label: route.label,
+                              onTap: () {
+                                setState(() {
+                                  _active = route.section;
+                                  _focusCourseId = null;
+                                });
+                              },
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  _UserPanel(collapsed: _collapsed, user: user),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: SafeArea(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                child: Container(
-                  key: ValueKey(active),
-                  padding: const EdgeInsets.all(24),
-                  child: active == null
-                      ? const _NoModulesView()
-                      : _pageFor(active),
+                    _UserPanel(collapsed: _collapsed, user: user),
+                  ],
                 ),
               ),
             ),
-          ),
-        ],
+            Expanded(
+              child: SafeArea(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: Container(
+                    key: ValueKey(active),
+                    padding: const EdgeInsets.all(24),
+                    child: active == null
+                        ? const _NoModulesView()
+                        : _pageFor(active),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -347,6 +365,7 @@ IconData _iconForSection(AppSection section) {
     AppSection.reports => Icons.report_problem_rounded,
     AppSection.lines => Icons.sim_card_rounded,
     AppSection.settings => Icons.settings_rounded,
+    AppSection.questionBank => Icons.quiz_rounded,
     AppSection.users => Icons.manage_accounts_rounded,
   };
 }

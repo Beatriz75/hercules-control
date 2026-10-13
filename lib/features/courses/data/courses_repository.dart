@@ -1,5 +1,6 @@
 import 'package:hercules_control/core/api/api_client.dart';
 import 'package:hercules_control/features/courses/data/course_models.dart';
+import 'package:hercules_control/features/courses/data/question_bank.dart';
 
 class CoursesRepository {
   const CoursesRepository(this._api);
@@ -90,4 +91,37 @@ class CoursesRepository {
         CourseProgressRow.fromJson(item as Map<String, dynamic>),
     ];
   }
+
+  /// Every active question of every course (courses.view).
+  Future<List<QuestionBankRow>> fetchQuestionBank({
+    int? courseId,
+    int? lessonId,
+  }) async {
+    final json =
+        await _api.get(
+              '/questions',
+              query: {
+                if (courseId != null) 'course_id': '$courseId',
+                if (lessonId != null) 'lesson_id': '$lessonId',
+              },
+            )
+            as List;
+    return [
+      for (final item in json)
+        QuestionBankRow.fromJson(item as Map<String, dynamic>),
+    ];
+  }
+
+  /// Updates one question (courses.manage). The returned row may have a new
+  /// id when the server had to retire the old question to keep history.
+  Future<QuestionBankRow> updateBankQuestion(
+    int id,
+    PracticeQuestion question,
+  ) async => QuestionBankRow.fromJson(
+    await _api.put(
+          '/questions/$id',
+          body: QuestionBankRow.updatePayload(question),
+        )
+        as Map<String, dynamic>,
+  );
 }
