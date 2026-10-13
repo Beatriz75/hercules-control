@@ -3,8 +3,10 @@ enum AppSection {
   employees,
   candidates,
   audits,
+  courses,
   performance,
   reports,
   lines,
   settings,
+  users,
 }

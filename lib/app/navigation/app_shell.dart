@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:hercules_control/app/navigation/app_route.dart';
 import 'package:hercules_control/app/navigation/app_section.dart';
+import 'package:hercules_control/core/auth/auth_scope.dart';
+import 'package:hercules_control/core/auth/current_user.dart';
+import 'package:hercules_control/core/theme/app_theme.dart';
+import 'package:hercules_control/core/widgets/brand_logo.dart';
 import 'package:hercules_control/features/audits/presentation/audits_page.dart';
+import 'package:hercules_control/features/auth/presentation/change_password_dialog.dart';
 import 'package:hercules_control/features/candidates/presentation/candidates_page.dart';
+import 'package:hercules_control/features/courses/presentation/courses_page.dart';
 import 'package:hercules_control/features/dashboard/presentation/dashboard_page.dart';
 import 'package:hercules_control/features/employees/presentation/employees_page.dart';
 import 'package:hercules_control/features/lines/presentation/lines_page.dart';
 import 'package:hercules_control/features/performance/presentation/performance_page.dart';
 import 'package:hercules_control/features/reports/presentation/reports_page.dart';
 import 'package:hercules_control/features/settings/presentation/settings_page.dart';
+import 'package:hercules_control/features/users/presentation/users_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -18,21 +25,34 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  AppSection _active = AppSection.dashboard;
+  AppSection? _active;
   bool _collapsed = false;
+
+  Widget _pageFor(AppSection section) {
+    return switch (section) {
+      AppSection.dashboard => const DashboardPage(),
+      AppSection.employees => const EmployeesPage(),
+      AppSection.candidates => const CandidatesPage(),
+      AppSection.audits => const AuditsPage(),
+      AppSection.courses => const CoursesPage(),
+      AppSection.performance => const PerformancePage(),
+      AppSection.reports => const ReportsPage(),
+      AppSection.lines => const LinesPage(),
+      AppSection.settings => const SettingsPage(),
+      AppSection.users => const UsersPage(),
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
-    final pages = <AppSection, Widget>{
-      AppSection.dashboard: const DashboardPage(),
-      AppSection.employees: const EmployeesPage(),
-      AppSection.candidates: const CandidatesPage(),
-      AppSection.audits: const AuditsPage(),
-      AppSection.performance: const PerformancePage(),
-      AppSection.reports: const ReportsPage(),
-      AppSection.lines: const LinesPage(),
-      AppSection.settings: const SettingsPage(),
-    };
+    final auth = AuthScope.of(context);
+    final user = auth.user!;
+    final routes = visibleRoutesFor(user.permissions);
+    final active = routes.any((route) => route.section == _active)
+        ? _active
+        : routes.isEmpty
+        ? null
+        : routes.first.section;
 
     return Scaffold(
       body: Row(
@@ -40,49 +60,28 @@ class _AppShellState extends State<AppShell> {
           AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             width: _collapsed ? 84 : 248,
-            color: const Color(0xFF0B1F33),
+            color: BrandColors.navy,
             child: SafeArea(
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                    child: Row(
+                    padding: EdgeInsets.fromLTRB(
+                      _collapsed ? 8 : 16,
+                      16,
+                      _collapsed ? 8 : 8,
+                      24,
+                    ),
+                    child: Flex(
+                      direction: _collapsed ? Axis.vertical : Axis.horizontal,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF173A5B),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            'H',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 22,
-                            ),
-                          ),
-                        ),
+                        const BrandMark(size: 44),
                         if (!_collapsed) ...[
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Hercules',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                Text(
-                                  'Control',
-                                  style: TextStyle(color: Color(0xFFB9C7D5)),
-                                ),
-                              ],
+                            child: BrandWordmark(
+                              fontSize: 17,
+                              titleColor: Colors.white,
                             ),
                           ),
                         ],
@@ -92,6 +91,9 @@ class _AppShellState extends State<AppShell> {
                               _collapsed = !_collapsed;
                             });
                           },
+                          tooltip: _collapsed
+                              ? 'Expandir menú'
+                              : 'Contraer menú',
                           icon: Icon(
                             _collapsed
                                 ? Icons.keyboard_double_arrow_right_rounded
@@ -106,10 +108,10 @@ class _AppShellState extends State<AppShell> {
                     child: ListView(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       children: [
-                        for (final route in appRoutes)
+                        for (final route in routes)
                           _SidebarTile(
                             collapsed: _collapsed,
-                            selected: _active == route.section,
+                            selected: active == route.section,
                             icon: _iconForSection(route.section),
                             label: route.label,
                             onTap: () {
@@ -121,6 +123,7 @@ class _AppShellState extends State<AppShell> {
                       ],
                     ),
                   ),
+                  _UserPanel(collapsed: _collapsed, user: user),
                 ],
               ),
             ),
@@ -130,14 +133,126 @@ class _AppShellState extends State<AppShell> {
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),
                 child: Container(
-                  key: ValueKey(_active),
+                  key: ValueKey(active),
                   padding: const EdgeInsets.all(24),
-                  child: pages[_active]!,
+                  child: active == null
+                      ? const _NoModulesView()
+                      : _pageFor(active),
                 ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _UserPanel extends StatelessWidget {
+  const _UserPanel({required this.collapsed, required this.user});
+
+  final bool collapsed;
+  final CurrentUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = AuthScope.read(context);
+
+    void changePassword() {
+      showDialog<void>(
+        context: context,
+        builder: (context) => const ChangePasswordDialog(),
+      );
+    }
+
+    final actions = [
+      IconButton(
+        onPressed: changePassword,
+        tooltip: 'Cambiar contraseña',
+        icon: const Icon(Icons.key_rounded, color: Color(0xFFC0CEDA)),
+      ),
+      IconButton(
+        onPressed: auth.logout,
+        tooltip: 'Cerrar sesión',
+        icon: const Icon(Icons.logout_rounded, color: Color(0xFFC0CEDA)),
+      ),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: BrandColors.navyDeep,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: collapsed
+          ? Column(mainAxisSize: MainAxisSize.min, children: actions)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  user.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    user.roleName,
+                    if (user.storeCode != null && user.storeCode!.isNotEmpty)
+                      user.storeCode!,
+                  ].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFB9C7D5),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: actions,
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _NoModulesView extends StatelessWidget {
+  const _NoModulesView();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lock_clock_rounded,
+              size: 48,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Sin módulos disponibles',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Tu rol todavía no tiene módulos habilitados en esta versión. Consulta con un administrador.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -163,12 +278,24 @@ class _SidebarTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: selected ? const Color(0xFF1D5E96) : Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        color: selected ? BrandColors.navyLight : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: selected
+              ? const BorderSide(color: BrandColors.gold, width: 1.2)
+              : BorderSide.none,
+        ),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(18),
-          child: Padding(
+          child: Container(
+            decoration: selected && !collapsed
+                ? const BoxDecoration(
+                    border: Border(
+                      left: BorderSide(color: BrandColors.gold, width: 4),
+                    ),
+                  )
+                : null,
             padding: EdgeInsets.symmetric(
               horizontal: collapsed ? 0 : 14,
               vertical: 14,
@@ -180,7 +307,9 @@ class _SidebarTile extends StatelessWidget {
               children: [
                 Icon(
                   icon,
-                  color: selected ? Colors.white : const Color(0xFFC0CEDA),
+                  color: selected
+                      ? BrandColors.goldLight
+                      : const Color(0xFFC0CEDA),
                 ),
                 if (!collapsed) ...[
                   const SizedBox(width: 12),
@@ -213,9 +342,11 @@ IconData _iconForSection(AppSection section) {
     AppSection.employees => Icons.groups_rounded,
     AppSection.candidates => Icons.badge_rounded,
     AppSection.audits => Icons.fact_check_rounded,
+    AppSection.courses => Icons.school_rounded,
     AppSection.performance => Icons.trending_up_rounded,
     AppSection.reports => Icons.report_problem_rounded,
     AppSection.lines => Icons.sim_card_rounded,
     AppSection.settings => Icons.settings_rounded,
+    AppSection.users => Icons.manage_accounts_rounded,
   };
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hercules_control/app/app_scope.dart';
 import 'package:hercules_control/app/navigation/app_shell.dart';
+import 'package:hercules_control/core/auth/auth_controller.dart';
+import 'package:hercules_control/core/auth/auth_scope.dart';
 import 'package:hercules_control/core/theme/app_theme.dart';
 import 'package:hercules_control/data/local/app_database.dart';
 import 'package:hercules_control/data/repositories/collection_repository.dart';
@@ -11,10 +13,12 @@ import 'package:hercules_control/data/repositories/employee_repository.dart';
 import 'package:hercules_control/data/repositories/line_repository.dart';
 import 'package:hercules_control/data/repositories/report_repository.dart';
 import 'package:hercules_control/data/repositories/weekly_report_repository.dart';
+import 'package:hercules_control/features/auth/presentation/login_page.dart';
 
 class HerculesControlApp extends StatelessWidget {
   const HerculesControlApp({
     super.key,
+    required this.authController,
     required this.database,
     required this.employeeRepository,
     required this.employeePaymentRepository,
@@ -26,6 +30,7 @@ class HerculesControlApp extends StatelessWidget {
     required this.weeklyReportRepository,
   });
 
+  final AuthController authController;
   final AppDatabase database;
   final EmployeeRepository employeeRepository;
   final EmployeePaymentRepository employeePaymentRepository;
@@ -48,12 +53,33 @@ class HerculesControlApp extends StatelessWidget {
       reportRepository: reportRepository,
       lineRepository: lineRepository,
       weeklyReportRepository: weeklyReportRepository,
-      child: MaterialApp(
-        title: 'Hercules Control',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        home: const AppShell(),
+      child: AuthScope(
+        controller: authController,
+        child: MaterialApp(
+          title: 'Hércules Control',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light(),
+          home: const _AuthGate(),
+        ),
       ),
     );
+  }
+}
+
+/// Shows the login page, the app shell or a loader depending on the session.
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = AuthScope.of(context);
+
+    return switch (auth.status) {
+      AuthStatus.restoring => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      AuthStatus.signedOut => const LoginPage(),
+      AuthStatus.signedIn => const AppShell(),
+    };
   }
 }

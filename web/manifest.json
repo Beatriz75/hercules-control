@@ -1,11 +1,11 @@
 {
-    "name": "hercules_control",
-    "short_name": "hercules_control",
+    "name": "Hércules Control",
+    "short_name": "Hércules",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F3F6FA",
+    "theme_color": "#0E2A47",
+    "description": "Hércules Control: capacitación y control operativo.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

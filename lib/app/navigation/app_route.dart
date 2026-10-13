@@ -6,12 +6,31 @@ class AppRouteDefinition {
     required this.path,
     required this.label,
     required this.requiredPermission,
+    this.alternativePermissions = const [],
+    this.enabled = false,
   });
 
   final AppSection section;
   final String path;
   final String label;
+
+  /// Main permission that grants access to the section.
   final String requiredPermission;
+
+  /// Other permissions that also grant access (any of them is enough).
+  final List<String> alternativePermissions;
+
+  /// Whether the module is released in the current delivery. Modules that are
+  /// still in development keep their route but are hidden from navigation.
+  final bool enabled;
+
+  List<String> get acceptedPermissions => [
+    requiredPermission,
+    ...alternativePermissions,
+  ];
+
+  bool isVisibleFor(Set<String> permissions) =>
+      enabled && acceptedPermissions.any(permissions.contains);
 }
 
 const appRoutes = [
@@ -40,6 +59,14 @@ const appRoutes = [
     requiredPermission: 'audits.view',
   ),
   AppRouteDefinition(
+    section: AppSection.courses,
+    path: '/courses',
+    label: 'Cursos',
+    requiredPermission: 'courses.view',
+    alternativePermissions: ['courses.take'],
+    enabled: true,
+  ),
+  AppRouteDefinition(
     section: AppSection.performance,
     path: '/performance',
     label: 'Rendimiento',
@@ -63,4 +90,17 @@ const appRoutes = [
     label: 'Configuración',
     requiredPermission: 'settings.view',
   ),
+  AppRouteDefinition(
+    section: AppSection.users,
+    path: '/users',
+    label: 'Usuarios',
+    requiredPermission: 'users.manage',
+    enabled: true,
+  ),
+];
+
+/// Routes shown in the navigation for a user with [permissions].
+List<AppRouteDefinition> visibleRoutesFor(Set<String> permissions) => [
+  for (final route in appRoutes)
+    if (route.isVisibleFor(permissions)) route,
 ];
