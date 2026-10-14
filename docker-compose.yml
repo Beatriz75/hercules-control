@@ -31,6 +31,10 @@ services:
       INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-admin}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
       INITIAL_ADMIN_FULL_NAME: ${INITIAL_ADMIN_FULL_NAME:-Administrador}
+      MEDIA_ROOT: /data/media
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-500}
+    volumes:
+      - media_data:/data/media
     depends_on:
       db:
         condition: service_healthy
@@ -54,3 +58,5 @@ services:
 
 volumes:
   postgres_data:
+  # Videos and images uploaded from the course editor (back it up with the database).
+  media_data:

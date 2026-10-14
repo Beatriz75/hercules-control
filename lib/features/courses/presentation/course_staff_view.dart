@@ -193,6 +193,7 @@ class _StaffCoursesViewState extends State<_StaffCoursesView> {
         highlightQuestionId: highlightQuestionId,
         onSave: _saveCourse,
         findSimilar: (prompt) => widget.repository.findSimilarQuestions(prompt),
+        uploadMedia: widget.repository.mediaUploader,
       ),
     );
   }

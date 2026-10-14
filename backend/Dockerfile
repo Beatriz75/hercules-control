@@ -14,8 +14,12 @@ COPY app ./app
 COPY migrations ./migrations
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+# /data/media holds uploaded videos and images (named volume media_data);
+# it is created here so a new volume inherits the app user's ownership.
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
-    && useradd --system --uid 10001 --no-create-home hercules
+    && useradd --system --uid 10001 --no-create-home hercules \
+    && mkdir -p /data/media \
+    && chown hercules /data/media
 USER hercules
 
 EXPOSE 8000

@@ -81,7 +81,7 @@ void main() {
     );
     expect(
       validateVideoUrl('https://example.com/video'),
-      'El video debe ser un enlace de YouTube, Google Drive, Vimeo o un archivo .mp4 / .webm.',
+      'El video debe ser un enlace de YouTube, Google Drive, Vimeo, un archivo .mp4 / .webm o un video subido a Hércules.',
     );
     expect(validateVideoTitle('x' * 161), isNotNull);
     expect(validateVideoTitle('Intro'), isNull);

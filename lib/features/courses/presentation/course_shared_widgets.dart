@@ -606,7 +606,7 @@ class _FullImage extends StatelessWidget {
         alignment: Alignment.center,
         constraints: BoxConstraints(maxHeight: maxHeight),
         child: Image.network(
-          url,
+          resolveMediaUrl(url),
           fit: BoxFit.contain,
           errorBuilder: (context, error, stackTrace) => Container(
             height: 100,

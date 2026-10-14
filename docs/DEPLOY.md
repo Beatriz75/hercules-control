@@ -94,7 +94,10 @@ Las migraciones se aplican solas al arrancar el backend. nginx no guarda en cach
 
 ## Copias de seguridad
 
-Toda la información está en PostgreSQL (incluidas las imágenes pegadas en las lecciones, guardadas como data URL dentro del curso).
+La información está en dos lugares y hay que respaldar los dos:
+
+- PostgreSQL: usuarios, cursos, preguntas y avance (incluidas las imágenes pegadas en las lecciones, guardadas como data URL dentro del curso).
+- Volumen `media_data`: los videos e imágenes subidos desde el editor del curso.
 
 ```bash
 # Respaldo (programarlo con cron, por ejemplo cada noche)
@@ -102,6 +105,12 @@ docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 
 # Restaurar sobre una base vacía
 docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < respaldo_AAAA-MM-DD.dump
+
+# Respaldo de los archivos subidos
+docker compose exec -T backend tar czf - -C /data/media . > media_$(date +%F).tar.gz
+
+# Restaurar los archivos subidos
+docker compose exec -T backend tar xzf - -C /data/media < media_AAAA-MM-DD.tar.gz
 ```
 
 ## Roles y permisos

@@ -1,4 +1,5 @@
 import 'package:hercules_control/core/api/api_client.dart';
+import 'package:hercules_control/core/media/media_upload.dart';
 import 'package:hercules_control/features/courses/data/course_models.dart';
 import 'package:hercules_control/features/courses/data/question_bank.dart';
 
@@ -6,6 +7,9 @@ class CoursesRepository {
   const CoursesRepository(this._api);
 
   final ApiClient _api;
+
+  /// Uploads videos/images picked on the computer to POST /media.
+  MediaUploader get mediaUploader => apiMediaUploader(_api);
 
   List<Course> _courses(Object? json) => [
     for (final item in (json as List))

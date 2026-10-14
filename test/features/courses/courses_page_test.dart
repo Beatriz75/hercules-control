@@ -421,13 +421,13 @@ void main() {
       (widget) =>
           widget is TextField &&
           widget.decoration?.hintText ==
-              'Enlace de YouTube, Google Drive, Vimeo o .mp4 / .webm',
+              'Enlace de YouTube, Google Drive, Vimeo o .mp4 / .webm, o súbelo desde la computadora',
     );
     await tester.enterText(videoField.first, 'https://example.com/clase');
     await tester.pump();
     expect(
       find.text(
-        'El video debe ser un enlace de YouTube, Google Drive, Vimeo o un archivo .mp4 / .webm.',
+        'El video debe ser un enlace de YouTube, Google Drive, Vimeo, un archivo .mp4 / .webm o un video subido a Hércules.',
       ),
       findsOneWidget,
     );

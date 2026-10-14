@@ -509,7 +509,7 @@ void main() {
 
     expect(broken.validationErrors(), [
       'Lección 1, video 1: El enlace del video debe empezar con http:// o https://.',
-      'Lección 1, pregunta 1: El video debe ser un enlace de YouTube, Google Drive, Vimeo o un archivo .mp4 / .webm.',
+      'Lección 1, pregunta 1: El video debe ser un enlace de YouTube, Google Drive, Vimeo, un archivo .mp4 / .webm o un video subido a Hércules.',
     ]);
   });
 }

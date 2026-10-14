@@ -1,6 +1,8 @@
 /// Video links accepted by the API and how to embed them.
 library;
 
+import 'package:hercules_control/core/media/media_upload.dart';
+
 enum VideoKind { youtube, drive, vimeo, file, unknown }
 
 typedef VideoEmbedInfo = ({VideoKind kind, String? embedUrl});
@@ -9,6 +11,9 @@ const _youtubeHosts = {'youtube.com', 'www.youtube.com', 'm.youtube.com'};
 const _vimeoHosts = {'vimeo.com', 'www.vimeo.com', 'player.vimeo.com'};
 final _youtubeId = RegExp(r'^[A-Za-z0-9_-]{6,}$');
 final _numeric = RegExp(r'^\d+$');
+
+/// Video uploaded to Hércules (POST /media), stored as a relative path.
+final uploadedVideoPath = RegExp(r'^/media/[0-9a-f]{32}\.(mp4|webm)$');
 
 Uri? _parseHttp(String url) {
   final uri = Uri.tryParse(url.trim());
@@ -28,6 +33,9 @@ bool _isVideoFile(Uri uri) {
 /// to embed. Unknown or invalid links return [VideoKind.unknown].
 VideoEmbedInfo toEmbedUrl(String url) {
   const unknown = (kind: VideoKind.unknown, embedUrl: null);
+  if (uploadedVideoPath.hasMatch(url.trim())) {
+    return (kind: VideoKind.file, embedUrl: resolveMediaUrl(url.trim()));
+  }
   final uri = _parseHttp(url);
   if (uri == null) return unknown;
   final host = uri.host.toLowerCase();
@@ -87,6 +95,7 @@ VideoEmbedInfo toEmbedUrl(String url) {
 String? validateVideoUrl(String? value) {
   final text = value?.trim() ?? '';
   if (text.isEmpty) return null;
+  if (uploadedVideoPath.hasMatch(text)) return null;
   final uri = _parseHttp(text);
   if (uri == null) {
     return 'El enlace del video debe empezar con http:// o https://.';
@@ -103,7 +112,7 @@ String? validateVideoUrl(String? value) {
   if (hosts.contains(uri.host.toLowerCase()) || _isVideoFile(uri)) {
     return null;
   }
-  return 'El video debe ser un enlace de YouTube, Google Drive, Vimeo o un archivo .mp4 / .webm.';
+  return 'El video debe ser un enlace de YouTube, Google Drive, Vimeo, un archivo .mp4 / .webm o un video subido a Hércules.';
 }
 
 /// Validator for the optional video title (max 160).
