@@ -249,7 +249,7 @@ class _PracticeDialogState extends State<_PracticeDialog> {
       child: Dialog(
         insetPadding: const EdgeInsets.all(24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
+          constraints: const BoxConstraints(maxWidth: 960),
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: SingleChildScrollView(
@@ -641,7 +641,7 @@ class _PracticeQuestionCard extends StatelessWidget {
           ],
           if (question.hasVideo) ...[
             const SizedBox(height: 10),
-            VideoEmbed(url: question.videoUrl!, maxWidth: 560),
+            VideoEmbed(url: question.videoUrl!),
           ],
           const SizedBox(height: 10),
           Text(

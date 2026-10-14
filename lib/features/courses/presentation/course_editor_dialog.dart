@@ -1479,7 +1479,7 @@ class _QuestionEditorCard extends StatelessWidget {
           if (question.hasVideo &&
               validateVideoUrl(question.videoUrl) == null) ...[
             const SizedBox(height: 8),
-            VideoEmbed(url: question.videoUrl!, maxWidth: 360),
+            VideoEmbed(url: question.videoUrl!),
           ],
           const SizedBox(height: 12),
           const _EditorFieldLabel('Tipo de respuesta'),
@@ -1808,7 +1808,7 @@ class _TheoryVideosEditorState extends State<_TheoryVideosEditor> {
                 if (video.$2.url.trim().isNotEmpty &&
                     validateVideoUrl(video.$2.url) == null) ...[
                   const SizedBox(height: 8),
-                  VideoEmbed(url: video.$2.url, maxWidth: 360),
+                  VideoEmbed(url: video.$2.url),
                 ],
               ],
             ),

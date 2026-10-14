@@ -2,14 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:hercules_control/core/video/video_links.dart';
 import 'package:hercules_control/core/video/video_platform.dart';
 
-/// Embedded video (16:9, max 720 px wide, rounded). On non-web platforms or
-/// for unknown formats it shows a card with an "Abrir video" action.
+/// Builds the platform player. Tests can replace it (on the VM there is no
+/// web player, so the link card would be shown instead).
+@visibleForTesting
+Widget? Function(String embedUrl, VideoKind kind) debugVideoPlayerBuilder =
+    buildPlatformVideoPlayer;
+
+/// Embedded video (16:9, up to [maxWidth] wide, rounded) with a
+/// "Ver en grande" action. On non-web platforms or for unknown formats it
+/// shows a card with an "Abrir video" action.
+///
+/// On the web the player is an <iframe>/<video> platform view, which swallows
+/// every click inside its rectangle even when a Flutter dialog is painted on
+/// top of it. So while another route (confirmation, menu, dialog) covers the
+/// route that holds the video, the player is removed and a placeholder of the
+/// same size is shown: the buttons of that dialog always get the click and the
+/// video stops. It comes back when the dialog closes.
 class VideoEmbed extends StatelessWidget {
   const VideoEmbed({
     super.key,
     required this.url,
     this.title,
-    this.maxWidth = 720,
+    this.maxWidth = 900,
   });
 
   final String url;
@@ -19,9 +33,12 @@ class VideoEmbed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final info = toEmbedUrl(url);
-    final player = info.embedUrl == null
+    final covered = !(ModalRoute.of(context)?.isCurrent ?? true);
+    final livePlayer = info.embedUrl == null
         ? null
-        : buildPlatformVideoPlayer(info.embedUrl!, info.kind);
+        : debugVideoPlayerBuilder(info.embedUrl!, info.kind);
+    final canPlay = livePlayer != null;
+    final player = covered ? null : livePlayer;
     final title = this.title?.trim() ?? '';
 
     return ConstrainedBox(
@@ -39,14 +56,117 @@ class VideoEmbed extends StatelessWidget {
             ),
             const SizedBox(height: 6),
           ],
-          if (player != null)
+          if (canPlay) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: AspectRatio(aspectRatio: 16 / 9, child: player),
-            )
-          else
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: player ?? const _VideoPausedPlaceholder(),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: covered
+                    ? null
+                    : () => showLargeVideoDialog(context, url, title: title),
+                icon: const Icon(Icons.fullscreen_rounded, size: 20),
+                label: const Text('Ver en grande'),
+              ),
+            ),
+          ] else
             _VideoLinkCard(url: url),
         ],
+      ),
+    );
+  }
+}
+
+/// Opens the video almost full screen. The iframe also allows the player's
+/// own full-screen button.
+Future<void> showLargeVideoDialog(
+  BuildContext context,
+  String url, {
+  String? title,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (context) => _LargeVideoDialog(url: url, title: title),
+  );
+}
+
+class _LargeVideoDialog extends StatelessWidget {
+  const _LargeVideoDialog({required this.url, this.title});
+
+  final String url;
+  final String? title;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = this.title?.trim() ?? '';
+    final info = toEmbedUrl(url);
+    final player = info.embedUrl == null
+        ? null
+        : debugVideoPlayerBuilder(info.embedUrl!, info.kind);
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      backgroundColor: Colors.black,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
+        child: Column(
+          children: [
+            // Header outside the video rectangle so "Cerrar" never sits
+            // under the iframe.
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title.isEmpty ? 'Video' : title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('Cerrar'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Center(
+                child: player == null
+                    ? _VideoLinkCard(url: url)
+                    : AspectRatio(aspectRatio: 16 / 9, child: player),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoPausedPlaceholder extends StatelessWidget {
+  const _VideoPausedPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: Icon(
+          Icons.play_circle_outline_rounded,
+          color: Colors.white54,
+          size: 48,
+        ),
       ),
     );
   }

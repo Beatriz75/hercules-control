@@ -729,7 +729,7 @@ class _BankQuestionCardState extends State<_BankQuestionCard> {
               ),
               label: Text(_showVideo ? 'Ocultar video' : 'Ver video'),
             ),
-            if (_showVideo) VideoEmbed(url: question.videoUrl!, maxWidth: 480),
+            if (_showVideo) VideoEmbed(url: question.videoUrl!),
           ],
           const SizedBox(height: 10),
           for (final option in question.options)

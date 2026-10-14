@@ -709,7 +709,7 @@ class _LessonPreviewDialog extends StatelessWidget {
                           const SizedBox(height: 6),
                           const _VideoChip(),
                           const SizedBox(height: 8),
-                          VideoEmbed(url: question.$2.videoUrl!, maxWidth: 480),
+                          VideoEmbed(url: question.$2.videoUrl!),
                         ],
                         if (question.$2.type == QuestionType.image &&
                             (question.$2.imageUrl ?? '').isNotEmpty) ...[

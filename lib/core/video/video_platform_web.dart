@@ -1,3 +1,4 @@
+import 'dart:js_interop';
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/widgets.dart';
@@ -29,12 +30,21 @@ Widget? buildPlatformVideoPlayer(String embedUrl, VideoKind kind) {
       }
       final iframe = web.HTMLIFrameElement()
         ..src = embedUrl
-        ..allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'
-        ..allowFullscreen = true;
+        ..allow = 'fullscreen; autoplay; encrypted-media; picture-in-picture'
+        ..allowFullscreen = true
+        ..referrerPolicy = 'strict-origin-when-cross-origin';
       iframe.style
         ..width = '100%'
         ..height = '100%'
         ..border = '0';
+      // A focused (cross-origin) iframe keeps every key press, so Esc would
+      // never reach the app. Give the focus back when the mouse leaves it.
+      iframe.addEventListener(
+        'mouseleave',
+        ((web.Event _) {
+          if (web.document.activeElement == iframe) iframe.blur();
+        }).toJS,
+      );
       return iframe;
     });
   }
