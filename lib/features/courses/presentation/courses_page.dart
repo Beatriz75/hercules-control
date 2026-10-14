@@ -12,6 +12,7 @@ import 'package:hercules_control/core/widgets/page_header.dart';
 import 'package:hercules_control/core/widgets/video_embed.dart';
 import 'package:hercules_control/core/video/video_links.dart';
 import 'package:hercules_control/features/courses/data/course_models.dart';
+import 'package:hercules_control/features/courses/data/course_search.dart';
 import 'package:hercules_control/features/courses/data/courses_repository.dart';
 import 'package:hercules_control/features/courses/data/question_bank.dart';
 import 'package:hercules_control/app/navigation/app_section.dart';

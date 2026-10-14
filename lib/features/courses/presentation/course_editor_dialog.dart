@@ -9,10 +9,14 @@ class _CourseTemplateEditorDialog extends StatefulWidget {
     required this.initialLessonIndex,
     required this.onSave,
     this.findSimilar,
+    this.highlightQuestionId,
   });
 
   final Course course;
   final int initialLessonIndex;
+
+  /// Question to scroll to and highlight on open (from the catalog search).
+  final int? highlightQuestionId;
 
   /// Persists the draft. Returns an error message, or null on success.
   final Future<String?> Function(Course course) onSave;
@@ -35,7 +39,9 @@ class _CourseTemplateEditorDialogState
   var _saving = false;
   var _dirty = false;
   String? _saveError;
+  int? _highlightedQuestionId;
   final _formKey = GlobalKey<FormState>();
+  final _highlightKey = GlobalKey();
 
   bool get _isNew => widget.course.id == null;
 
@@ -50,6 +56,19 @@ class _CourseTemplateEditorDialogState
     _theoryImagesController = TextEditingController(
       text: _selectedLesson.theoryImageUrls.join('\n'),
     );
+    _highlightedQuestionId = widget.highlightQuestionId;
+    if (_highlightedQuestionId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final target = _highlightKey.currentContext;
+        if (target == null || !target.mounted) return;
+        Scrollable.ensureVisible(
+          target,
+          alignment: 0.1,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+        );
+      });
+    }
   }
 
   @override
@@ -59,6 +78,9 @@ class _CourseTemplateEditorDialogState
   }
 
   Lesson get _selectedLesson => _draft.lessons[_selectedLessonIndex];
+
+  bool _isHighlighted(PracticeQuestion question) =>
+      question.id != null && question.id == _highlightedQuestionId;
 
   bool _questionMatchesSearch(PracticeQuestion question) {
     final query = _questionSearchQuery.trim().toLowerCase();
@@ -111,6 +133,7 @@ class _CourseTemplateEditorDialogState
   void _selectLesson(int lessonIndex) {
     setState(() {
       _selectedLessonIndex = lessonIndex;
+      _highlightedQuestionId = null;
       _syncTheoryImagesController();
     });
   }
@@ -897,38 +920,44 @@ class _CourseTemplateEditorDialogState
                                       (entry) =>
                                           _questionMatchesSearch(entry.$2),
                                     )) ...[
-                                  _QuestionEditorCard(
-                                    key: ValueKey(
-                                      'question-$_selectedLessonIndex-${question.$1}-${question.$2.id}',
+                                  KeyedSubtree(
+                                    key: _isHighlighted(question.$2)
+                                        ? _highlightKey
+                                        : null,
+                                    child: _QuestionEditorCard(
+                                      key: ValueKey(
+                                        'question-$_selectedLessonIndex-${question.$1}-${question.$2.id}',
+                                      ),
+                                      highlighted: _isHighlighted(question.$2),
+                                      number: question.$1 + 1,
+                                      question: question.$2,
+                                      lessonIndex: _selectedLessonIndex,
+                                      lessons: _draft.lessons,
+                                      canMoveUp: question.$1 > 0,
+                                      canMoveDown:
+                                          question.$1 <
+                                          _selectedLesson.questions.length - 1,
+                                      canRemove:
+                                          _selectedLesson.questions.length > 1,
+                                      canChangeLesson:
+                                          _selectedLesson.questions.length > 1,
+                                      onChanged: (updatedQuestion) =>
+                                          _replaceQuestion(
+                                            question.$1,
+                                            updatedQuestion,
+                                          ),
+                                      onLessonChanged: (lessonIndex) =>
+                                          _moveQuestionToLesson(
+                                            question.$1,
+                                            lessonIndex,
+                                          ),
+                                      onMoveUp: () =>
+                                          _moveQuestion(question.$1, -1),
+                                      onMoveDown: () =>
+                                          _moveQuestion(question.$1, 1),
+                                      onRemove: () =>
+                                          _removeQuestion(question.$1),
                                     ),
-                                    number: question.$1 + 1,
-                                    question: question.$2,
-                                    lessonIndex: _selectedLessonIndex,
-                                    lessons: _draft.lessons,
-                                    canMoveUp: question.$1 > 0,
-                                    canMoveDown:
-                                        question.$1 <
-                                        _selectedLesson.questions.length - 1,
-                                    canRemove:
-                                        _selectedLesson.questions.length > 1,
-                                    canChangeLesson:
-                                        _selectedLesson.questions.length > 1,
-                                    onChanged: (updatedQuestion) =>
-                                        _replaceQuestion(
-                                          question.$1,
-                                          updatedQuestion,
-                                        ),
-                                    onLessonChanged: (lessonIndex) =>
-                                        _moveQuestionToLesson(
-                                          question.$1,
-                                          lessonIndex,
-                                        ),
-                                    onMoveUp: () =>
-                                        _moveQuestion(question.$1, -1),
-                                    onMoveDown: () =>
-                                        _moveQuestion(question.$1, 1),
-                                    onRemove: () =>
-                                        _removeQuestion(question.$1),
                                   ),
                                   const SizedBox(height: 12),
                                 ],
@@ -1118,6 +1147,7 @@ class _QuestionEditorCard extends StatelessWidget {
     required this.onMoveUp,
     required this.onMoveDown,
     required this.onRemove,
+    this.highlighted = false,
   }) : standalone = false,
        belowPrompt = null;
 
@@ -1138,12 +1168,16 @@ class _QuestionEditorCard extends StatelessWidget {
        onMoveUp = _noop,
        onMoveDown = _noop,
        onRemove = _noop,
+       highlighted = false,
        standalone = true;
 
   static void _ignoreInt(int _) {}
   static void _noop() {}
 
   final bool standalone;
+
+  /// Marked as the result picked in the catalog search.
+  final bool highlighted;
 
   /// Extra content right under the question text (similar questions).
   final Widget? belowPrompt;
@@ -1259,8 +1293,13 @@ class _QuestionEditorCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.85),
-        border: Border.all(color: colorScheme.outlineVariant),
+        color: highlighted
+            ? colorScheme.primary.withValues(alpha: 0.08)
+            : colorScheme.surface.withValues(alpha: 0.85),
+        border: Border.all(
+          color: highlighted ? colorScheme.primary : colorScheme.outlineVariant,
+          width: highlighted ? 2 : 1,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(

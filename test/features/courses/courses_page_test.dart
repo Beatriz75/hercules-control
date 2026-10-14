@@ -17,6 +17,7 @@ Map<String, dynamic> _question(int lessonId, int index) => {
   'id': lessonId * 10 + index,
   'lesson_id': lessonId,
   'prompt': 'Pregunta $index de $lessonId',
+  if (lessonId == 11 && index == 2) 'code': 'P65',
   'question_type': 'text',
   'answer_mode': 'single',
   'image_url': null,
@@ -405,6 +406,8 @@ void main() {
     expect(find.text('2 de 3 al azar'), findsOneWidget);
     expect(find.text('3 de 3 al azar'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Editar plantilla'));
+    await tester.pump();
     await tester.tap(find.text('Editar plantilla'));
     await _settle(tester);
     expect(find.text('Guardar curso'), findsOneWidget);
@@ -476,6 +479,8 @@ void main() {
       'courses.manage',
     ]);
     await _pumpShell(tester, auth);
+    await tester.ensureVisible(find.text('Editar plantilla'));
+    await tester.pump();
     await tester.tap(find.text('Editar plantilla'));
     await _settle(tester);
 
@@ -533,6 +538,89 @@ void main() {
     expect(_similarPrompts, hasLength(1));
     expect(find.textContaining('parecida'), findsNothing);
     expect(_coursePuts, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
+  Finder searchField() => find.byWidgetPredicate(
+    (widget) =>
+        widget is TextField &&
+        widget.decoration?.hintText ==
+            'Buscar lección, pregunta o código (P65)',
+  );
+
+  testWidgets('catalog search finds a question by code and opens it', (
+    tester,
+  ) async {
+    final auth = await _signIn(tester, 'administrador', [
+      'courses.view',
+      'courses.manage',
+    ]);
+    await _pumpShell(tester, auth);
+
+    await tester.enterText(searchField(), 'p65');
+    await tester.pump();
+    expect(find.text('Ruta Mexi › Lección 2: Lección 11'), findsOneWidget);
+    expect(find.text('P65'), findsOneWidget);
+    // The course list and detail panel are hidden while searching.
+    expect(find.text('Editar plantilla'), findsNothing);
+
+    await tester.tap(find.text('Pregunta 2: Pregunta 2 de 11'));
+    await _settle(tester);
+    expect(find.text('Editor · Lección 2'), findsOneWidget);
+    expect(find.text('Guardar curso'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('catalog search ignores accents and clears back to the list', (
+    tester,
+  ) async {
+    final auth = await _signIn(tester, 'administrador', [
+      'courses.view',
+      'courses.manage',
+    ]);
+    await _pumpShell(tester, auth);
+
+    for (final query in ['leccion 10', 'LECCIÓN 10']) {
+      await tester.enterText(searchField(), query);
+      await tester.pump();
+      expect(find.text('Ruta Mexi › Lección 1: Lección 10'), findsOneWidget);
+      expect(find.text('Coincide en título de la lección.'), findsOneWidget);
+      expect(find.text('Ruta Mexi › Lección 2: Lección 11'), findsNothing);
+    }
+
+    await tester.enterText(searchField(), 'teoria');
+    await tester.pump();
+    expect(find.text('Coincide en teoría de la lección.'), findsNWidgets(2));
+
+    await tester.enterText(searchField(), 'zzz');
+    await tester.pump();
+    expect(find.textContaining('Sin resultados'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Limpiar búsqueda'));
+    await tester.pump();
+    expect(find.text('Editar plantilla'), findsOneWidget);
+
+    // Tapping a lesson result opens the editor on that lesson.
+    await tester.enterText(searchField(), 'lección 11');
+    await tester.pump();
+    await tester.tap(find.text('Ruta Mexi › Lección 2: Lección 11'));
+    await _settle(tester);
+    expect(find.text('Editor · Lección 2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('read-only staff opens the lesson preview from the search', (
+    tester,
+  ) async {
+    final auth = await _signIn(tester, 'supervisor', ['courses.view']);
+    await _pumpShell(tester, auth);
+
+    await tester.enterText(searchField(), 'pregunta 3 de 10');
+    await tester.pump();
+    await tester.tap(find.text('Pregunta 3: Pregunta 3 de 10'));
+    await _settle(tester);
+    expect(find.text('Ruta Mexi · Lección 1'), findsOneWidget);
+    expect(find.text('Guardar curso'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

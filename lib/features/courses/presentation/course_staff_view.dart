@@ -29,12 +29,53 @@ class _StaffCoursesViewState extends State<_StaffCoursesView> {
   String? _storeFilter;
   var _tab = _StaffTab.catalog;
   var _busy = false;
+  var _searchQuery = '';
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _selectedCourseId = widget.initialCourseId;
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() => _searchQuery = '');
+  }
+
+  /// Opens a search result: the editor on that lesson (and question) for
+  /// administrators, the lesson preview for read-only staff.
+  void _openSearchHit(CourseSearchHit hit, {PracticeQuestion? question}) {
+    final course = hit.course;
+    final lessonIndex = hit.lessonIndex;
+    setState(() => _selectedCourseId = course.id);
+    if (widget.canManage) {
+      _openEditor(
+        course,
+        initialLessonIndex: lessonIndex ?? 0,
+        highlightQuestionId: question?.id,
+      );
+      return;
+    }
+    if (lessonIndex == null) {
+      _clearSearch();
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (context) => _LessonPreviewDialog(
+        course: course,
+        lesson: course.lessons[lessonIndex],
+        lessonNumber: lessonIndex + 1,
+      ),
+    );
   }
 
   Future<void> _load() async {
@@ -138,13 +179,18 @@ class _StaffCoursesViewState extends State<_StaffCoursesView> {
     );
   }
 
-  void _openEditor(Course course, {int initialLessonIndex = 0}) {
+  void _openEditor(
+    Course course, {
+    int initialLessonIndex = 0,
+    int? highlightQuestionId,
+  }) {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _CourseTemplateEditorDialog(
         course: course,
         initialLessonIndex: initialLessonIndex,
+        highlightQuestionId: highlightQuestionId,
         onSave: _saveCourse,
         findSimilar: (prompt) => widget.repository.findSimilarQuestions(prompt),
       ),
@@ -218,6 +264,7 @@ class _StaffCoursesViewState extends State<_StaffCoursesView> {
     final courses = _courses ?? const <Course>[];
     final visible = _visibleCourses;
     final selected = _selectedCourse;
+    final searching = _searchQuery.trim().isNotEmpty;
     final published = courses.where((course) => course.visibleToStudents);
     final lessonCount = visible.fold<int>(
       0,
@@ -307,27 +354,51 @@ class _StaffCoursesViewState extends State<_StaffCoursesView> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  if (visible.isEmpty)
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      hintText: 'Buscar lección, pregunta o código (P65)',
+                      suffixIcon: _searchQuery.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: _clearSearch,
+                              tooltip: 'Limpiar búsqueda',
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                    ),
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                  ),
+                  const SizedBox(height: 14),
+                  if (searching)
+                    _CourseSearchResults(
+                      hits: searchCourseCatalog(visible, _searchQuery),
+                      canManage: widget.canManage,
+                      onOpen: _openSearchHit,
+                    )
+                  else if (visible.isEmpty)
                     _EmptyState(
                       icon: Icons.school_outlined,
                       message: widget.canManage
                           ? 'No hay cursos para este filtro. Crea uno con "Nuevo curso".'
                           : 'No hay cursos para este filtro.',
                     ),
-                  for (final course in visible) ...[
-                    _CourseTile(
-                      course: course,
-                      statusLabels: _statusLabels(course),
-                      selected: course.id == selected?.id,
-                      onTap: () =>
-                          setState(() => _selectedCourseId = course.id),
-                    ),
-                    if (course != visible.last) const SizedBox(height: 10),
-                  ],
+                  if (!searching)
+                    for (final course in visible) ...[
+                      _CourseTile(
+                        course: course,
+                        statusLabels: _statusLabels(course),
+                        selected: course.id == selected?.id,
+                        onTap: () =>
+                            setState(() => _selectedCourseId = course.id),
+                      ),
+                      if (course != visible.last) const SizedBox(height: 10),
+                    ],
                 ],
               ),
             ),
-            if (selected != null) ...[
+            if (selected != null && !searching) ...[
               const SizedBox(height: 16),
               _StaffCourseDetailPanel(
                 course: selected,
@@ -515,4 +586,196 @@ class _StaffCourseDetailPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Results of the catalog search, grouped as "Curso › Lección".
+class _CourseSearchResults extends StatelessWidget {
+  const _CourseSearchResults({
+    required this.hits,
+    required this.canManage,
+    required this.onOpen,
+  });
+
+  /// Questions listed per lesson before collapsing the rest.
+  static const _maxQuestions = 6;
+
+  final List<CourseSearchHit> hits;
+  final bool canManage;
+  final void Function(CourseSearchHit hit, {PracticeQuestion? question}) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    if (hits.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.search_off_rounded,
+        message:
+            'Sin resultados. Prueba con otra palabra o con el código (P65).',
+      );
+    }
+
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final questionCount = hits.fold<int>(
+      0,
+      (total, hit) => total + hit.questions.length,
+    );
+    final lessonCount = hits.where((hit) => hit.lessonIndex != null).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${_plural(lessonCount, 'lección', 'lecciones')} · '
+          '${_plural(questionCount, 'pregunta', 'preguntas')}'
+          '${canManage ? ' · Toca un resultado para abrir el editor en esa lección.' : ''}',
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 10),
+        for (final hit in hits) ...[
+          _CourseSearchHitCard(
+            hit: hit,
+            maxQuestions: _maxQuestions,
+            onOpen: onOpen,
+          ),
+          if (hit != hits.last) const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+String _plural(int count, String one, String many) =>
+    '$count ${count == 1 ? one : many}';
+
+class _CourseSearchHitCard extends StatelessWidget {
+  const _CourseSearchHitCard({
+    required this.hit,
+    required this.maxQuestions,
+    required this.onOpen,
+  });
+
+  final CourseSearchHit hit;
+  final int maxQuestions;
+  final void Function(CourseSearchHit hit, {PracticeQuestion? question}) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final lesson = hit.lesson;
+    final shown = hit.questions.take(maxQuestions).toList();
+    final hidden = hit.questions.length - shown.length;
+    final reason = hit.courseTitle
+        ? 'Coincide el título del curso.'
+        : hit.lessonFields.isEmpty
+        ? null
+        : 'Coincide en ${_joinLabels([for (final field in hit.lessonFields) field.label])} de la lección.';
+
+    return Material(
+      color: hit.hasExactCode
+          ? colorScheme.primary.withValues(alpha: 0.08)
+          : colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: hit.hasExactCode
+              ? colorScheme.primary
+              : colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: hit.hasExactCode ? 1.4 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => onOpen(hit),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              child: Row(
+                children: [
+                  Icon(
+                    lesson == null
+                        ? Icons.school_rounded
+                        : Icons.menu_book_rounded,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          lesson == null
+                              ? hit.course.title
+                              : '${hit.course.title} › Lección ${hit.lessonIndex! + 1}: ${lesson.title}',
+                          style: textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (reason != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            reason,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          for (final match in shown)
+            InkWell(
+              onTap: () => onOpen(hit, question: match.question),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(48, 6, 14, 6),
+                child: Row(
+                  children: [
+                    if (match.question.code != null) ...[
+                      _QuestionCodeChip(code: match.question.code!),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Text(
+                        'Pregunta ${match.index + 1}: '
+                        '${match.question.prompt.trim().isEmpty ? 'Sin texto' : match.question.prompt.trim()}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (hidden > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(48, 4, 14, 0),
+              child: Text(
+                'y ${_plural(hidden, 'pregunta más', 'preguntas más')}',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          if (shown.isNotEmpty) const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+String _joinLabels(List<String> labels) {
+  if (labels.length <= 1) return labels.join();
+  return '${labels.sublist(0, labels.length - 1).join(', ')} y ${labels.last}';
 }
