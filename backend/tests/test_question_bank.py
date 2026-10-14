@@ -172,3 +172,75 @@ def test_similar_questions_detects_repeats_across_courses(client: TestClient) ->
 
     client.act_as(Role.SUPERVISOR, "sup")
     assert client.get("/questions/similar", params={"prompt": "tiempo de respuesta"}).status_code == 403
+
+
+def _with_code(prompt: str, code: str | None, sort_order: int = 1) -> dict:
+    return {
+        "code": code,
+        "prompt": prompt,
+        "sort_order": sort_order,
+        "options": [
+            {"label": "Bien", "is_correct": True, "sort_order": 1},
+            {"label": "Mal", "is_correct": False, "sort_order": 2},
+        ],
+    }
+
+
+def _lesson(title: str, questions: list[dict]) -> dict:
+    return {"title": title, "summary": "s", "theory": "t", "sort_order": 1, "questions": questions}
+
+
+def test_question_code_is_normalized_saved_and_filterable(client: TestClient) -> None:
+    client.act_as(Role.ADMINISTRADOR, "admin")
+    first = client.post(
+        "/courses",
+        json={"title": "Cobranza", "stores": ["Ofertas"], "lessons": [_lesson("L1", [_with_code("Común", " p 97 "), _with_code("Sin código", "", 2)])]},
+    )
+    assert first.status_code == 201
+    questions = first.json()["lessons"][0]["questions"]
+    assert [q["code"] for q in questions] == ["P97", None]
+    # The same common question can share its code in another course.
+    second = client.post(
+        "/courses",
+        json={"title": "Líneas", "stores": ["Mexi"], "lessons": [_lesson("L1", [_with_code("Común", "P97")])]},
+    )
+    assert second.status_code == 201
+
+    client.act_as(Role.SUPERVISOR, "sup")
+    rows = client.get("/questions").json()
+    assert [row["code"] for row in rows] == ["P97", None, "P97"]
+    matches = client.get("/questions", params={"code": "p97"}).json()
+    assert [(row["course_title"], row["code"]) for row in matches] == [("Cobranza", "P97"), ("Líneas", "P97")]
+    assert client.get("/questions", params={"code": "P9"}).json() == []
+
+    client.act_as(Role.ADMINISTRADOR, "admin")
+    too_long = client.post("/courses", json={"title": "X", "stores": ["Ofertas"], "lessons": [_lesson("L1", [_with_code("Q", "P" * 21)])]})
+    assert too_long.status_code == 422
+
+
+def test_question_code_survives_course_update_and_bank_edits(client: TestClient) -> None:
+    client.act_as(Role.ADMINISTRADOR, "admin")
+    course = client.post(
+        "/courses",
+        json={"title": "Cobranza", "stores": ["Ofertas"], "lessons": [_lesson("L1", [_with_code("Uno", "P1")])]},
+    ).json()
+    lesson = course["lessons"][0]
+    question = lesson["questions"][0]
+
+    # PUT /courses/{id} in place keeps and changes the code.
+    lesson_body = _lesson("L1", [_with_code("Uno", "p2") | {"id": question["id"], "options": [
+        {"id": question["options"][0]["id"], "label": "Bien", "is_correct": True, "sort_order": 1},
+        {"id": question["options"][1]["id"], "label": "Mal", "is_correct": False, "sort_order": 2},
+    ]}]) | {"id": lesson["id"]}
+    updated = client.put(f"/courses/{course['id']}", json={"title": "Cobranza", "stores": ["Ofertas"], "lessons": [lesson_body]})
+    assert updated.status_code == 200
+    updated_question = updated.json()["lessons"][0]["questions"][0]
+    assert updated_question["id"] == question["id"] and updated_question["code"] == "P2"
+
+    # PUT /questions/{id} edits the code; POST /questions saves it.
+    edited = client.put(f"/questions/{question['id']}", json=_with_code("Uno", "P3"))
+    assert edited.status_code == 200 and edited.json()["code"] == "P3"
+    cleared = client.put(f"/questions/{question['id']}", json=_with_code("Uno", None))
+    assert cleared.json()["code"] is None
+    created = client.post("/questions", json=_with_code("Dos", "p 4") | {"lesson_id": lesson["id"]})
+    assert created.status_code == 201 and created.json()["code"] == "P4"

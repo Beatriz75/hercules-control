@@ -1321,6 +1321,35 @@ class _QuestionEditorCard extends StatelessWidget {
             ],
             const SizedBox(height: 12),
           ],
+          const _EditorFieldLabel('Código (opcional)'),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: 220,
+            child: TextFormField(
+              initialValue: question.code ?? '',
+              textCapitalization: TextCapitalization.characters,
+              decoration: fieldDecoration().copyWith(
+                hintText: 'Ej. P97',
+                prefixIcon: const Icon(Icons.tag_rounded),
+                errorMaxLines: 2,
+              ),
+              validator: (value) {
+                final error = validateQuestionCode(value);
+                return error == null
+                    ? null
+                    : '${error[0].toUpperCase()}${error.substring(1)}';
+              },
+              onChanged: (value) {
+                final code = normalizeQuestionCode(value);
+                onChanged(
+                  code == null
+                      ? question.copyWith(clearCode: true)
+                      : question.copyWith(code: code),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
           const _EditorFieldLabel('Contenido visual de la pregunta'),
           const SizedBox(height: 6),
           DropdownButtonFormField<QuestionType>(
@@ -1388,7 +1417,7 @@ class _QuestionEditorCard extends StatelessWidget {
             ),
             if (question.imageUrl != null && question.imageUrl!.isNotEmpty) ...[
               const SizedBox(height: 8),
-              _QuestionImage(url: question.imageUrl!, height: 160),
+              _QuestionImage(url: question.imageUrl!),
             ],
           ],
           const SizedBox(height: 12),

@@ -115,6 +115,25 @@ class QuestionOption {
   };
 }
 
+/// Question codes are upper-case without spaces; an empty code means none.
+String? normalizeQuestionCode(String? value) {
+  if (value == null) return null;
+  final code = value.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+  return code.isEmpty ? null : code;
+}
+
+/// Maximum length of a question code (same as the server).
+const questionCodeMaxLength = 20;
+
+/// Lower-case error for an invalid code, or null.
+String? validateQuestionCode(String? value) {
+  final code = normalizeQuestionCode(value);
+  if (code != null && code.length > questionCodeMaxLength) {
+    return 'el código no puede tener más de $questionCodeMaxLength caracteres.';
+  }
+  return null;
+}
+
 class PracticeQuestion {
   const PracticeQuestion({
     this.id,
@@ -124,6 +143,7 @@ class PracticeQuestion {
     this.answerMode = AnswerMode.single,
     this.imageUrl,
     this.videoUrl,
+    this.code,
   });
 
   factory PracticeQuestion.blank() => const PracticeQuestion(
@@ -153,6 +173,7 @@ class PracticeQuestion {
       answerMode: AnswerMode.fromCode(json['answer_mode'] as String?),
       imageUrl: json['image_url'] as String?,
       videoUrl: _emptyToNull(json['video_url'] as String?),
+      code: normalizeQuestionCode(json['code'] as String?),
       options: [for (final option in options) QuestionOption.fromJson(option)],
     );
   }
@@ -168,6 +189,9 @@ class PracticeQuestion {
   final String? videoUrl;
 
   bool get hasVideo => (videoUrl ?? '').trim().isNotEmpty;
+
+  /// Optional visible code (e.g. "P97"), upper-case and without spaces.
+  final String? code;
 
   List<int> get correctOptionIndexes => [
     for (final option in options.indexed)
@@ -185,9 +209,12 @@ class PracticeQuestion {
     bool clearImageUrl = false,
     String? videoUrl,
     bool clearVideoUrl = false,
+    String? code,
+    bool clearCode = false,
   }) {
     return PracticeQuestion(
       id: id,
+      code: clearCode ? null : code ?? this.code,
       prompt: prompt ?? this.prompt,
       options: options ?? this.options,
       type: type ?? this.type,
@@ -201,6 +228,7 @@ class PracticeQuestion {
   /// question is moved to another lesson).
   PracticeQuestion withoutIds() {
     return PracticeQuestion(
+      code: code,
       prompt: prompt,
       type: type,
       answerMode: answerMode,
@@ -212,6 +240,7 @@ class PracticeQuestion {
 
   Map<String, dynamic> toPayload(int sortOrder) => {
     'id': ?id,
+    'code': normalizeQuestionCode(code),
     'prompt': prompt.trim(),
     'question_type': type.code,
     'answer_mode': answerMode.code,
@@ -532,6 +561,8 @@ class Course {
 List<String> practiceQuestionErrors(PracticeQuestion q) {
   final errors = <String>[];
   if (q.prompt.trim().isEmpty) errors.add('falta el enunciado.');
+  final codeError = validateQuestionCode(q.code);
+  if (codeError != null) errors.add(codeError);
   if (q.options.length < 2) errors.add('necesita al menos 2 opciones.');
   final videoError = validateVideoUrl(q.videoUrl);
   if (videoError != null) errors.add(videoError);

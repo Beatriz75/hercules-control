@@ -540,7 +540,7 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
                   decoration: InputDecoration(
                     isDense: true,
                     prefixIcon: const Icon(Icons.search_rounded),
-                    hintText: 'Buscar en enunciados y opciones',
+                    hintText: 'Buscar por texto o código (P97)',
                     suffixIcon: _filter.search.isEmpty
                         ? null
                         : IconButton(
@@ -667,6 +667,10 @@ class _BankQuestionCardState extends State<_BankQuestionCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (question.code != null) ...[
+                      _QuestionCodeChip(code: question.code!),
+                      const SizedBox(height: 6),
+                    ],
                     Text(
                       question.prompt,
                       style: const TextStyle(fontWeight: FontWeight.w700),
@@ -708,9 +712,9 @@ class _BankQuestionCardState extends State<_BankQuestionCard> {
           ),
           if (imageUrl.isNotEmpty) ...[
             const SizedBox(height: 10),
-            SizedBox(
-              width: 240,
-              child: _QuestionImage(url: imageUrl, height: 130),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: _QuestionImage(url: imageUrl, maxHeight: 200),
             ),
           ],
           if (question.hasVideo) ...[
@@ -758,6 +762,38 @@ class _BankQuestionCardState extends State<_BankQuestionCard> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Highlighted label with the question's code (e.g. "P97").
+class _QuestionCodeChip extends StatelessWidget {
+  const _QuestionCodeChip({required this.code});
+
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: 'Código de la pregunta',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer,
+          border: Border.all(color: colorScheme.primary),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          code,
+          style: TextStyle(
+            color: colorScheme.onPrimaryContainer,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5,
+          ),
+        ),
       ),
     );
   }

@@ -115,6 +115,8 @@ class TrainingQuestion(Base):
     lesson_id: Mapped[int] = mapped_column(
         ForeignKey("course_lessons.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    # Visible, searchable code (e.g. "P97"); not unique: a common question may share it across courses.
+    code: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     prompt: Mapped[str] = mapped_column(Text(), nullable=False)
     question_type: Mapped[str] = mapped_column(String(20), nullable=False, server_default="text")
     answer_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="single")

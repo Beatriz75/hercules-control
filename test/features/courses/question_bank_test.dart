@@ -11,12 +11,15 @@ Map<String, dynamic> bankRowJson({
   List<String> stores = const ['Ofertas'],
   List<String> labels = const ['Revisar en Banxico', 'Aceptarlo'],
   String? videoUrl,
+  String? code,
+  String? imageUrl,
 }) => {
   'id': id,
+  'code': code,
   'prompt': prompt,
   'question_type': 'text',
   'answer_mode': answerMode,
-  'image_url': null,
+  'image_url': imageUrl,
   'video_url': videoUrl,
   'sort_order': 3,
   'options': [
@@ -92,6 +95,36 @@ void main() {
     expect(ids('codigo'), [2]);
     expect(ids('  '), [1, 2]);
     expect(ids('inexistente'), isEmpty);
+  });
+
+  test('search finds by code; an exact code match goes first', () {
+    final rows = [
+      QuestionBankRow.fromJson(bankRowJson(id: 1, prompt: 'Ver el folio P970')),
+      QuestionBankRow.fromJson(bankRowJson(id: 2, code: 'P12')),
+      QuestionBankRow.fromJson(bankRowJson(id: 3, code: 'p97')),
+    ];
+    expect(rows[2].question.code, 'P97');
+
+    List<int> ids(String search) => QuestionBankFilter(
+      search: search,
+    ).apply(rows).map((row) => row.id).toList();
+
+    expect(ids('P97'), [3, 1]);
+    expect(ids(' p97 '), [3, 1]);
+    expect(ids('p12'), [2]);
+    expect(ids('P1'), [2]);
+  });
+
+  test('code is normalized in the payload and validated', () {
+    final question = PracticeQuestion.blank().copyWith(code: ' p 9 7 ');
+    expect(question.toPayload(1)['code'], 'P97');
+    expect(PracticeQuestion.blank().toPayload(1)['code'], isNull);
+    expect(
+      practiceQuestionErrors(
+        PracticeQuestion.blank().copyWith(prompt: 'X', code: 'P' * 21),
+      ),
+      contains('el código no puede tener más de 20 caracteres.'),
+    );
   });
 
   test('filters by store, course, lesson and answer mode', () {

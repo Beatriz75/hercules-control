@@ -71,6 +71,7 @@ def _build_lessons(payload: CourseCreate) -> list[CourseLesson]:
             ],
             questions=[
                 TrainingQuestion(
+                    code=question.code,
                     prompt=question.prompt,
                     question_type=question.question_type,
                     answer_mode=question.answer_mode,
@@ -229,6 +230,7 @@ def _referenced_option_ids(db: Session, option_ids: set[int]) -> set[int]:
 
 def _new_question(payload: TrainingQuestionCreate) -> TrainingQuestion:
     return TrainingQuestion(
+        code=payload.code,
         prompt=payload.prompt,
         question_type=payload.question_type,
         answer_mode=payload.answer_mode,
@@ -264,6 +266,7 @@ def _apply_question(
         lesson.questions.append(_new_question(payload))
         return
 
+    question.code = payload.code
     question.prompt = payload.prompt
     question.question_type = payload.question_type
     question.answer_mode = payload.answer_mode

@@ -568,23 +568,10 @@ class _TheoryImagesBlock extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           for (final imageUrl in imageUrls.indexed) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Image.network(
-                imageUrl.$2,
-                width: double.infinity,
-                height: 220,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 96,
-                  alignment: Alignment.center,
-                  color: colorScheme.errorContainer,
-                  child: Text(
-                    'No se pudo cargar la imagen ${imageUrl.$1 + 1}.',
-                    style: TextStyle(color: colorScheme.onErrorContainer),
-                  ),
-                ),
-              ),
+            _FullImage(
+              url: imageUrl.$2,
+              maxHeight: 420,
+              errorText: 'No se pudo cargar la imagen ${imageUrl.$1 + 1}.',
             ),
             if (imageUrl.$1 != imageUrls.length - 1) const SizedBox(height: 12),
           ],
@@ -594,11 +581,18 @@ class _TheoryImagesBlock extends StatelessWidget {
   }
 }
 
-class _QuestionImage extends StatelessWidget {
-  const _QuestionImage({required this.url, this.height = 180});
+/// Whole image (never cropped): as wide as available, at most [maxHeight]
+/// tall, keeping its proportions over a neutral background.
+class _FullImage extends StatelessWidget {
+  const _FullImage({
+    required this.url,
+    required this.maxHeight,
+    required this.errorText,
+  });
 
   final String url;
-  final double height;
+  final double maxHeight;
+  final String errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -606,23 +600,42 @@ class _QuestionImage extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        url,
-        height: height,
+      child: Container(
         width: double.infinity,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
-          height: 100,
-          alignment: Alignment.center,
-          color: colorScheme.errorContainer,
-          child: Text(
-            'No se pudo cargar la foto de esta pregunta.',
-            style: TextStyle(color: colorScheme.onErrorContainer),
+        color: colorScheme.surfaceContainerHighest,
+        alignment: Alignment.center,
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Image.network(
+          url,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => Container(
+            height: 100,
+            width: double.infinity,
+            alignment: Alignment.center,
+            color: colorScheme.errorContainer,
+            child: Text(
+              errorText,
+              style: TextStyle(color: colorScheme.onErrorContainer),
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _QuestionImage extends StatelessWidget {
+  const _QuestionImage({required this.url, this.maxHeight = 360});
+
+  final String url;
+  final double maxHeight;
+
+  @override
+  Widget build(BuildContext context) => _FullImage(
+    url: url,
+    maxHeight: maxHeight,
+    errorText: 'No se pudo cargar la foto de esta pregunta.',
+  );
 }
 
 /// Theory + questions of a lesson for staff, showing the correct answers.
@@ -703,7 +716,7 @@ class _LessonPreviewDialog extends StatelessWidget {
                           const SizedBox(height: 8),
                           _QuestionImage(
                             url: question.$2.imageUrl!,
-                            height: 140,
+                            maxHeight: 240,
                           ),
                         ],
                         const SizedBox(height: 6),

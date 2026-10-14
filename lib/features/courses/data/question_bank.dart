@@ -114,8 +114,10 @@ class QuestionBankFilter {
     }
     final query = normalizeForSearch(search.trim());
     if (query.isEmpty) return true;
+    if (_isExactCode(row)) return true;
     final text = normalizeForSearch(
       [
+        row.question.code ?? '',
         row.question.prompt,
         for (final option in row.question.options) option.label,
       ].join(' '),
@@ -123,10 +125,22 @@ class QuestionBankFilter {
     return text.contains(query);
   }
 
-  List<QuestionBankRow> apply(List<QuestionBankRow> rows) => [
-    for (final row in rows)
-      if (matches(row)) row,
-  ];
+  bool _isExactCode(QuestionBankRow row) {
+    final code = row.question.code;
+    return code != null && code == normalizeQuestionCode(search);
+  }
+
+  /// Matching rows; an exact code match (e.g. "p97" -> P97) goes first.
+  List<QuestionBankRow> apply(List<QuestionBankRow> rows) {
+    final matching = [
+      for (final row in rows)
+        if (matches(row)) row,
+    ];
+    return [
+      ...matching.where(_isExactCode),
+      ...matching.where((row) => !_isExactCode(row)),
+    ];
+  }
 }
 
 /// Row of `GET /questions/similar`: an existing question and how similar it

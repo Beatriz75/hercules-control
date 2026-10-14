@@ -20,8 +20,17 @@ class TrainingQuestionOptionCreate(BaseModel):
     sort_order: int = Field(ge=1)
 
 
+def normalize_question_code(value: str | None) -> str | None:
+    """Question codes are stored upper-case without spaces; an empty code means no code."""
+    if value is None:
+        return None
+    code = "".join(value.split()).upper()
+    return code or None
+
+
 class TrainingQuestionCreate(BaseModel):
     id: int | None = None
+    code: str | None = None
     prompt: str = Field(min_length=1, max_length=4000)
     question_type: Literal["text", "image"] = "text"
     answer_mode: Literal["single", "multiple"] = "single"
@@ -34,6 +43,14 @@ class TrainingQuestionCreate(BaseModel):
     @classmethod
     def check_video(cls, value: str | None) -> str | None:
         return validate_video_url(value)
+
+    @field_validator("code")
+    @classmethod
+    def check_code(cls, value: str | None) -> str | None:
+        code = normalize_question_code(value)
+        if code is not None and len(code) > 20:
+            raise ValueError("El código de la pregunta no puede tener más de 20 caracteres.")
+        return code
 
     @model_validator(mode="after")
     def validate_options(self) -> "TrainingQuestionCreate":
@@ -130,6 +147,7 @@ class TrainingQuestionRead(BaseModel):
 
     id: int
     lesson_id: int
+    code: str | None = None
     prompt: str
     question_type: str
     answer_mode: str
@@ -291,6 +309,7 @@ class QuestionUpdate(TrainingQuestionCreate):
 
 class QuestionBankRow(BaseModel):
     id: int
+    code: str | None = None
     prompt: str
     question_type: str
     answer_mode: str

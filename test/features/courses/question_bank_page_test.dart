@@ -107,6 +107,8 @@ Future<AuthController> _signIn(
           id: 2,
           prompt: 'Pago en OXXO',
           labels: ['Código de barras', 'Transferencia'],
+          code: 'P97',
+          imageUrl: 'https://img.test/oxxo.png',
         ),
       ]);
     }
@@ -183,15 +185,33 @@ void main() {
     expect(find.byIcon(Icons.check_circle_rounded), findsNWidgets(2));
 
     await tester.enterText(
-      find.widgetWithText(TextField, 'Buscar en enunciados y opciones'),
+      find.widgetWithText(TextField, 'Buscar por texto o código (P97)'),
       'CODIGO',
     );
     await tester.pump();
     expect(find.text('1 pregunta'), findsOneWidget);
     expect(find.text('Pago en OXXO'), findsOneWidget);
 
+    // The question photo is shown whole (contain), never cropped.
+    final photo = tester.widget<Image>(
+      find.byWidgetPredicate(
+        (widget) => widget is Image && widget.image is NetworkImage,
+      ),
+    );
+    expect(photo.fit, BoxFit.contain);
+
+    // The code is shown on the card and the search finds it.
+    expect(find.text('P97'), findsOneWidget);
     await tester.enterText(
-      find.widgetWithText(TextField, 'Buscar en enunciados y opciones'),
+      find.widgetWithText(TextField, 'Buscar por texto o código (P97)'),
+      'p97',
+    );
+    await tester.pump();
+    expect(find.text('1 pregunta'), findsOneWidget);
+    expect(find.text('Pago en OXXO'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Buscar por texto o código (P97)'),
       'nada parecido',
     );
     await tester.pump();
@@ -311,14 +331,15 @@ void main() {
       await tester.tap(find.text('Lección 2: Transferencias').last);
       await _settle(tester);
 
-      // Fields in the card: video link, question text, option 1, option 2.
+      // Fields in the card: code, video link, question text, option 1, option 2.
       final fields = find.descendant(
         of: find.byType(Dialog),
         matching: find.byType(TextFormField),
       );
-      await tester.enterText(fields.at(1), 'Pregunta nueva');
-      await tester.enterText(fields.at(2), 'Sí');
-      await tester.enterText(fields.at(3), 'No');
+      await tester.enterText(fields.at(0), 'p 97');
+      await tester.enterText(fields.at(2), 'Pregunta nueva');
+      await tester.enterText(fields.at(3), 'Sí');
+      await tester.enterText(fields.at(4), 'No');
       await tester.pump();
       await tester.tap(find.text('Guardar y agregar otra'));
       await _settle(tester);
@@ -326,6 +347,7 @@ void main() {
       expect(_posts, hasLength(1));
       expect(_posts.single['lesson_id'], 10);
       expect(_posts.single['prompt'], 'Pregunta nueva');
+      expect(_posts.single['code'], 'P97');
       expect(
         (_posts.single['options'] as List).map((option) => option['label']),
         ['Sí', 'No'],
@@ -338,7 +360,7 @@ void main() {
       // Dialog stays open with the same lesson and an empty question.
       expect(find.text('Nueva pregunta'), findsWidgets);
       expect(find.text('Lección 2: Transferencias'), findsOneWidget);
-      expect(tester.widget<TextFormField>(fields.at(1)).initialValue, '');
+      expect(tester.widget<TextFormField>(fields.at(2)).initialValue, '');
 
       await tester.tap(find.text('Cancelar').last);
       await _settle(tester);
@@ -381,7 +403,7 @@ void main() {
     await _settle(tester);
     await tester.tap(find.text('Lección 2: Transferencias').last);
     await _settle(tester);
-    // Fields in the card: video link, question text, option 1, option 2.
+    // Fields in the card: code, video link, question text, option 1, option 2.
     return find.descendant(
       of: find.byType(Dialog),
       matching: find.byType(TextFormField),
@@ -390,11 +412,11 @@ void main() {
 
   Future<void> fillQuestion(WidgetTester tester, Finder fields) async {
     await tester.enterText(
-      fields.at(1),
+      fields.at(2),
       '¿Cómo valido una transferencia SPEI?',
     );
-    await tester.enterText(fields.at(2), 'En Banxico');
-    await tester.enterText(fields.at(3), 'No se valida');
+    await tester.enterText(fields.at(3), 'En Banxico');
+    await tester.enterText(fields.at(4), 'No se valida');
     await tester.pump(const Duration(milliseconds: 700));
     await _settle(tester);
   }

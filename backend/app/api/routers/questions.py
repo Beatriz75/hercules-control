@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import require_permission
@@ -11,7 +11,13 @@ from app.core.similarity import similarity
 from app.db.session import get_db
 from app.models.course import Course, CourseLesson, TrainingQuestion
 from app.models.user import User
-from app.schemas.course import QuestionBankRow, QuestionCreate, QuestionUpdate, SimilarQuestionRow
+from app.schemas.course import (
+    QuestionBankRow,
+    QuestionCreate,
+    QuestionUpdate,
+    SimilarQuestionRow,
+    normalize_question_code,
+)
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -24,6 +30,7 @@ def _row(question: TrainingQuestion) -> QuestionBankRow:
     course = lesson.course
     return QuestionBankRow(
         id=question.id,
+        code=question.code,
         prompt=question.prompt,
         question_type=question.question_type,
         answer_mode=question.answer_mode,
@@ -60,6 +67,7 @@ def list_question_bank(
     _: CourseViewer,
     course_id: int | None = None,
     lesson_id: int | None = None,
+    code: str | None = None,
     db: Session = Depends(get_db),
 ) -> list[QuestionBankRow]:
     """Every active question of every course, with its course and lesson, for the general bank view."""
@@ -68,6 +76,11 @@ def list_question_bank(
         query = query.where(Course.id == course_id)
     if lesson_id is not None:
         query = query.where(CourseLesson.id == lesson_id)
+    if code is not None:
+        normalized = normalize_question_code(code)
+        if normalized is None:
+            return []
+        query = query.where(func.upper(TrainingQuestion.code) == normalized)
     questions = db.scalars(
         query.order_by(Course.sort_order, Course.id, CourseLesson.sort_order, TrainingQuestion.sort_order)
     ).unique()
