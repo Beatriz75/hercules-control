@@ -1,68 +1,22 @@
-# Guia de ejecucion web
+# Guía de ejecución
 
-## Estado
+El despliegue, la ejecución local, las variables de entorno y las copias de seguridad están en [DEPLOY.md](DEPLOY.md).
 
-Este documento describe la ejecucion local de la etapa web. La API base FastAPI ya puede levantarse con Docker Compose; la persistencia sigue planificada para una issue posterior.
+Resumen:
 
-## Stack objetivo
-
-- Frontend: Flutter Web y Dart.
-- Backend: FastAPI y Python.
-- Base de datos: PostgreSQL pendiente.
-- Migraciones: Alembic pendiente.
-- Infraestructura: Docker y Docker Compose.
-- Produccion: servidor con HTTPS.
-
-## Desarrollo local
-
-Levantar la API base:
-
-```powershell
-docker compose up --build
+```bash
+cp .env.example .env          # completar POSTGRES_PASSWORD, AUTH_SECRET_KEY e INITIAL_ADMIN_PASSWORD
+docker compose up -d --build  # app en http://localhost:8080, API en /api
 ```
 
-Servicios actuales:
+Validación:
 
-- backend API en `http://localhost:8000`.
-
-Healthcheck:
-
-```powershell
-Invoke-RestMethod http://localhost:8000/health
-```
-
-## Variables de entorno planificadas
-
-- `DATABASE_URL`
-- `SECRET_KEY`
-- `ALLOWED_ORIGINS`
-- `ENVIRONMENT`
-- `HTTPS_ENABLED`
-
-## Validacion esperada
-
-Frontend:
-
-```powershell
-flutter analyze
-flutter test
-```
-
-Backend:
-
-```powershell
-cd backend
-pip install -r requirements-dev.txt
-pytest
-```
-
-Infraestructura:
-
-```powershell
+```bash
+flutter analyze && flutter test
+cd backend && python -m pytest
 docker compose config
-docker compose up --build
 ```
 
-## Restriccion de alcance
+## Restricción de alcance
 
-La configuracion local y de despliegue no debe crear servicios ni variables para integraciones bancarias, validacion SPEI, antifraude financiero o modulos financieros excluidos.
+La configuración local y de despliegue no debe crear servicios ni variables para integraciones bancarias, validación SPEI, antifraude financiero o módulos financieros excluidos.
