@@ -19,7 +19,7 @@ class AuditTemplateCreate(BaseModel):
     def validate_unique_sort_orders(self) -> "AuditTemplateCreate":
         sort_orders = [criterion.sort_order for criterion in self.criteria]
         if len(sort_orders) != len(set(sort_orders)):
-            raise ValueError("criteria sort_order values must be unique")
+            raise ValueError("El orden de los criterios no puede repetirse.")
         return self
 
 

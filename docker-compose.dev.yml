@@ -1,0 +1,9 @@
+# Desarrollo local: publica la API en localhost:8000 para correr Flutter con `flutter run -d chrome`.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db backend
+services:
+  backend:
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: development
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5000}
