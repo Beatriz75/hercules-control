@@ -1,77 +1,72 @@
-# Hercules Control
+# Hércules Control
 
-Herramienta web interna para auditoria, supervision de personal y control operativo.
-
-La primera etapa web queda limitada a ocho modulos aprobados. No incluye modulos financieros, integraciones bancarias ni validacion de comprobantes.
+Herramienta web interna para capacitar y controlar al personal de las tiendas (Ofertas y Mexi).
 
 ## Estado actual: v1.0.0
 
-Primera versión desplegable: inicio de sesión, 5 roles (Administrador, Supervisor, Auditor, Consulta gerencial, Alumno/Cobrador), **Usuarios** y **Cursos**. Los demás módulos están en el código pero ocultos en la navegación hasta su versión.
+Primera versión en producción. Incluye:
 
-- Despliegue: [docs/DEPLOY.md](docs/DEPLOY.md)
-- Notas de versión: [docs/releases/](docs/releases/)
-- Próximo: [examen de simulación](docs/diseno_examen_simulacion.md) (diseño de interfaces pendiente)
-- Puertos: la app y la API se publican juntas en `WEB_PORT` (por defecto `8080`; la API en `/api`). Postgres y el backend no publican puertos. En desarrollo, `docker-compose.dev.yml` publica la API en `8000`.
-- Ramas y versiones: ver la skill `.claude/skills/colaboracion-desarrollo-despliegue/SKILL.md`.
+- **Inicio de sesión y 5 roles**: Administrador, Supervisor, Consulta gerencial, Auditor y Alumno/Cobrador. Los permisos se revisan en el servidor en cada acción.
+- **Usuarios** (Administrador): altas, rol, tienda, activar/desactivar y restablecer contraseña.
+- **Cursos**: catálogo y editor por tienda, teoría con imágenes y videos (por enlace o **subidos a Hércules**), prácticas calificadas en el servidor con preguntas al azar, desbloqueo de lecciones en orden y **Avance de alumnos**.
+- **Banco de preguntas**: todas las preguntas de todos los cursos con filtros, buscador por texto o código (P1, P2…) y aviso de preguntas parecidas.
 
-## Documentacion
+El menú muestra solo **Cursos**, **Banco de preguntas** y **Usuarios** (según el rol). Los demás módulos (Dashboard, Empleados, Candidatos, Auditorías, Rendimiento, Reportes, Líneas WhatsApp, Configuración) siguen en el código pero ocultos a propósito hasta su versión.
 
-- [Vision del proyecto](docs/project_overview.md)
-- [Guia de ejecucion](docs/runbook.md)
-- [Guia funcional](docs/user_guide.md)
+## Desplegar
+
+Requisitos: un servidor con Docker y Docker Compose, y un dominio con HTTPS delante. Guía completa: [docs/DEPLOY.md](docs/DEPLOY.md).
+
+```bash
+git clone https://github.com/Beatriz75/hercules-control.git && cd hercules-control
+git checkout v1.0.0
+cp .env.example .env      # completar POSTGRES_PASSWORD, AUTH_SECRET_KEY e INITIAL_ADMIN_PASSWORD
+docker compose up -d --build
+docker compose ps         # db, backend y web en "running"; backend y web en "healthy"
+```
+
+- **Servicios**: `db` (PostgreSQL 16), `backend` (FastAPI) y `web` (Flutter web servido con nginx, que reenvía `/api` al backend).
+- **Puertos**: la app y la API se publican juntas en `WEB_PORT` (por defecto `8080`; la API en `/api`). Postgres y el backend no publican puertos. En desarrollo, `docker-compose.dev.yml` publica la API en `8000`.
+- **Datos que no se pueden perder**: los volúmenes `postgres_data` (base de datos) y `media_data` (videos e imágenes subidos). **Respaldar los dos** (ver DEPLOY.md).
+- **Migraciones**: Alembic; se aplican solas al arrancar el backend.
+- **Notas de cada versión** (qué cambió, variables nuevas, pasos manuales, cómo revertir): [docs/releases/](docs/releases/).
+
+## Manuales de usuario
+
+- [Manual del Administrador](docs/Manual_del_Administrador_Hercules_Control_v1.0.0.docx): alta de cobradores, usuarios, publicar y editar cursos, banco de preguntas y avance.
+- [Manual del Cobrador](docs/Manual_del_Cobrador_Hercules_Control_v1.0.0.docx): primer día, teoría, práctica y qué hacer si algo falla.
+- [Manual general (todos los roles)](docs/Manual_de_usuario_Hercules_Control_v1.0.0.docx).
+
+## Cómo colaboramos
+
+- Ramas: `main` (solo producción, entra por pull request), `develop` (integración), `feature/…`, `fix/…`, `hotfix/…`.
+- Versiones `vMAYOR.MENOR.PARCHE`: cada despliegue es una etiqueta de Git, una Release en GitHub y la misma etiqueta en las imágenes Docker (`APP_VERSION`).
+- Ninguna clave va en el repositorio: todo se configura en `.env` (plantilla en [.env.example](.env.example)).
+- Reglas completas: [.claude/skills/colaboracion-desarrollo-despliegue/SKILL.md](.claude/skills/colaboracion-desarrollo-despliegue/SKILL.md).
+
+## Stack
+
+- **Frontend**: Flutter web (Dart).
+- **Backend**: FastAPI (Python), Pydantic, SQLAlchemy y sesiones con JWT.
+- **Base de datos**: PostgreSQL con migraciones Alembic.
+- **Infraestructura**: Docker y Docker Compose, nginx, variables de entorno, HTTPS en producción.
+
+## Siguientes versiones
+
+- **Examen de simulación** al terminar el curso: un día de trabajo reducido con 5 a 10 pedidos ficticios. Ver [docs/diseno_examen_simulacion.md](docs/diseno_examen_simulacion.md) (diseño de interfaces pendiente).
+- Habilitar uno por uno los módulos ocultos, pasando sus datos al backend (hoy Empleados, Líneas y Reportes guardan sus datos solo en el navegador).
+
+Fuera de alcance de la etapa web: cobros, deudas, comprobantes como módulo propio, cuentas autorizadas, pagos a empleados, integraciones bancarias, validación SPEI y antifraude financiero. `Comprobantes diarios` queda solo como métrica manual dentro de Auditorías/Rendimiento.
+
+## Documentación de diseño
+
+- [Visión del proyecto](docs/project_overview.md)
 - [Requisitos web](docs/requirements.md)
 - [Arquitectura web](docs/mvp_architecture.md)
 - [Modelo de datos web](docs/data_model.md)
-- [Metrica manual de comprobantes diarios](docs/weekly_reports.md)
+- [Identidad visual](docs/identidad_visual.md)
+- [Guía de ejecución](docs/runbook.md)
+- [Guía funcional](docs/user_guide.md)
+- [Métrica manual de comprobantes diarios](docs/weekly_reports.md)
 - [Roadmap web](docs/roadmap.md)
 - [Propuesta local de issues web](docs/web_issues.md)
-
-## Alcance aprobado de la primera etapa web
-
-El sidebar web debe contener exclusivamente:
-
-1. Dashboard
-2. Empleados
-3. Candidatos
-4. Auditorias
-5. Rendimiento
-6. Reportes
-7. Lineas WhatsApp
-8. Configuracion
-
-No deben existir modulos futuros ocultos, deshabilitados ni placeholders en la navegacion inicial.
-
-## Fuera de alcance en esta etapa
-
-Estos temas no forman parte del plan, arquitectura, backlog, milestones ni interfaces iniciales:
-
-- Cobros
-- Deudas
-- Comprobantes como modulo independiente
-- Cuentas autorizadas
-- Pagos a empleados
-- Usuarios CRM
-- Integraciones bancarias
-- Validacion SPEI
-- Antifraude financiero
-
-Regla critica: `Comprobantes diarios` queda unicamente como metrica manual dentro de Auditorias/Rendimiento. No es modulo financiero ni flujo de validacion de comprobantes.
-
-## Stack web planificado
-
-- Frontend: Flutter Web, Dart, layout desktop, sidebar izquierdo, navegacion estructurada y manejo de estado justificado.
-- Backend: FastAPI, Python, API REST, Pydantic, servicios y repositorios.
-- Base de datos: PostgreSQL con Alembic.
-- Infraestructura: Docker, Docker Compose, variables de entorno, despliegue en servidor y HTTPS en produccion.
-
-## MVP Flutter desktop reutilizable
-
-El MVP actual de Flutter desktop puede aportar patrones y piezas reutilizables para la web:
-
-- shell visual con sidebar izquierdo colapsable y modulo activo resaltado;
-- componentes compartidos de UI como paneles, tarjetas metricas, badges y graficas simples;
-- pantallas de Dashboard, Empleados, Reportes y Lineas como referencia funcional;
-- criterios de auditoria/rendimiento derivados de evaluaciones diarias y estadisticas semanales;
-- repositorios y entidades existentes como insumo conceptual para el modelo web.
-
-La reutilizacion es de diseno y logica de negocio. La etapa web debe planificarse con backend FastAPI y PostgreSQL, no como extension directa de SQLite local.
