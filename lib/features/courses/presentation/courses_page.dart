@@ -24,6 +24,7 @@ import 'package:hercules_control/app/navigation/shell_navigation.dart';
 import 'package:hercules_control/features/courses/presentation/clipboard_image_reader.dart';
 import 'package:intl/intl.dart';
 
+part 'course_attempts_review.dart';
 part 'course_editor_dialog.dart';
 part 'course_practice_dialog.dart';
 part 'course_progress_view.dart';

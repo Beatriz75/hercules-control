@@ -388,7 +388,12 @@ void main() {
     await _settle(tester);
     expect(find.byType(DataTable), findsNothing);
     expect(find.text('Ana Pérez de la Cobranza (ana)'), findsOneWidget);
-    expect(find.text('1/2'), findsNWidgets(2));
+    expect(find.text('Preguntas más falladas'), findsOneWidget);
+    expect(find.text('Ver intentos'), findsWidgets);
+    // The second student's card is below the fold: scroll to it.
+    await tester.drag(find.byType(ListView).last, const Offset(0, -300));
+    await _settle(tester);
+    expect(find.text('Luis Pérez de la Cobranza (luis)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
