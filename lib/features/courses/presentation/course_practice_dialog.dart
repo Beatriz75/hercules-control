@@ -246,47 +246,44 @@ class _PracticeDialogState extends State<_PracticeDialog> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _close();
       },
-      child: Dialog(
-        insetPadding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Práctica', style: textTheme.labelLarge),
-                            const SizedBox(height: 6),
-                            Text(lesson.title, style: textTheme.headlineSmall),
-                          ],
-                        ),
+      child: ResponsiveDialog(
+        maxWidth: 960,
+        child: Padding(
+          padding: EdgeInsets.all(context.dialogPadding),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Práctica', style: textTheme.labelLarge),
+                          const SizedBox(height: 6),
+                          Text(lesson.title, style: textTheme.headlineSmall),
+                        ],
                       ),
-                      IconButton(
-                        onPressed: _submitting ? null : _close,
-                        icon: const Icon(Icons.close_rounded),
-                        tooltip: 'Cerrar',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    result == null
-                        ? '${_practiceDescription(lesson)}. Responde una pregunta a la vez; al terminar se envían todas tus respuestas y el sistema calcula la nota.'
-                        : 'Resultado de tu intento.',
-                  ),
-                  const SizedBox(height: 20),
-                  ...body,
-                ],
-              ),
+                    ),
+                    IconButton(
+                      onPressed: _submitting ? null : _close,
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: 'Cerrar',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  result == null
+                      ? '${_practiceDescription(lesson)}. Responde una pregunta a la vez; al terminar se envían todas tus respuestas y el sistema calcula la nota.'
+                      : 'Resultado de tu intento.',
+                ),
+                const SizedBox(height: 20),
+                ...body,
+              ],
             ),
           ),
         ),
