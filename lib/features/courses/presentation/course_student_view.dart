@@ -77,6 +77,11 @@ class _StudentCoursesViewState extends State<_StudentCoursesView> {
     return completedTasks / (course.lessons.length * 2);
   }
 
+  int _approvedLessons(Course course) => [
+    for (var index = 0; index < course.lessons.length; index++)
+      _lessonProgress(course, index),
+  ].where((progress) => progress.practiceApproved).length;
+
   String _courseStatus(Course course) {
     final progress = _courseProgress(course);
     if (progress == 1) return 'Completado';
@@ -215,6 +220,7 @@ class _StudentCoursesViewState extends State<_StudentCoursesView> {
                             statusLabels: [
                               _courseStatus(course.$2),
                               '${(_courseProgress(course.$2) * 100).round()}%',
+                              '${_approvedLessons(course.$2)}/${course.$2.lessons.length} prácticas aprobadas',
                             ],
                             selected: course.$1 == _selectedCourseIndex,
                             onTap: () => setState(
