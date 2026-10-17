@@ -97,6 +97,7 @@ Future<AuthController> _signIn(
   String role,
   List<String> permissions, {
   bool secondTheoryDone = false,
+  double? secondBestScore,
 }) async {
   final client = MockClient((request) async {
     final path = request.url.path;
@@ -214,7 +215,7 @@ Future<AuthController> _signIn(
             'lesson_id': 11,
             'theory_completed': true,
             'practice_approved': false,
-            'best_score_percent': null,
+            'best_score_percent': secondBestScore,
             'completed_at': null,
             'updated_at': '2026-10-12T15:30:00',
           },
@@ -279,6 +280,41 @@ void main() {
     );
     expect(find.text('Usuarios'), findsNothing);
     expect(find.text('Editar plantilla'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('alumno sees on each lesson whether the practice was approved', (
+    tester,
+  ) async {
+    final auth = await _signIn(
+      tester,
+      'alumno',
+      ['courses.take'],
+      secondTheoryDone: true,
+      secondBestScore: 50,
+    );
+    await _pumpShell(tester, auth);
+
+    expect(
+      find.text('Práctica aprobada · nota 100% (mínimo 80%)'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Práctica no aprobada · mejor nota 50% (mínimo 80%)'),
+      findsOneWidget,
+    );
+    expect(find.text('Repasa la teoría e inténtalo de nuevo.'), findsOneWidget);
+    expect(find.text('1/2 prácticas aprobadas'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('alumno sees a practice not taken yet', (tester) async {
+    final auth = await _signIn(tester, 'alumno', [
+      'courses.take',
+    ], secondTheoryDone: true);
+    await _pumpShell(tester, auth);
+
+    expect(find.text('Práctica sin hacer (mínimo 80%)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

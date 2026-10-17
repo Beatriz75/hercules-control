@@ -441,11 +441,9 @@ class _RoadmapStep extends StatelessWidget {
                   locked: locked,
                 ),
                 const SizedBox(height: 4),
-                _MiniTaskStatus(
-                  label: progress.bestScorePercent == null
-                      ? 'Práctica'
-                      : 'Práctica (mejor nota ${progress.bestScorePercent!.round()}%)',
-                  completed: progress.practiceApproved,
+                _PracticeStatus(
+                  progress: progress,
+                  requiredApprovalPercent: lesson.requiredApprovalPercent,
                   locked: locked || !progress.theoryCompleted,
                 ),
               ],
@@ -501,6 +499,70 @@ class _MiniTaskStatus extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Practice result that stays on the lesson card after the attempt dialog is
+/// closed: approved, not approved (with the best score) or not taken yet.
+class _PracticeStatus extends StatelessWidget {
+  const _PracticeStatus({
+    required this.progress,
+    required this.requiredApprovalPercent,
+    required this.locked,
+  });
+
+  final LessonProgress progress;
+  final int requiredApprovalPercent;
+  final bool locked;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final best = progress.bestScorePercent?.round();
+    final minimum = 'mínimo $requiredApprovalPercent%';
+
+    if (progress.practiceApproved) {
+      return _MiniTaskStatus(
+        label: 'Práctica aprobada · nota $best% ($minimum)',
+        completed: true,
+        locked: false,
+      );
+    }
+    if (best == null) {
+      return _MiniTaskStatus(
+        label: 'Práctica sin hacer ($minimum)',
+        completed: false,
+        locked: locked,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.cancel_rounded, size: 16, color: colorScheme.error),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'Práctica no aprobada · mejor nota $best% ($minimum)',
+                style: TextStyle(
+                  color: colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Padding(
+          padding: const EdgeInsets.only(left: 22),
+          child: Text(
+            'Repasa la teoría e inténtalo de nuevo.',
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
           ),
         ),
       ],
