@@ -108,6 +108,9 @@ class _UsersPageState extends State<UsersPage> {
 }
 
 class _UsersTable extends StatelessWidget {
+  /// Below this width the users are listed as cards.
+  static const double _tableMinWidth = 900;
+
   const _UsersTable({
     required this.users,
     required this.currentUserId,
@@ -127,73 +130,173 @@ class _UsersTable extends StatelessWidget {
     }
     final dateFormat = DateFormat('dd/MM/yyyy');
 
-    return SingleChildScrollView(
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columns: const [
-            DataColumn(label: Text('Usuario')),
-            DataColumn(label: Text('Nombre')),
-            DataColumn(label: Text('Rol')),
-            DataColumn(label: Text('Tienda')),
-            DataColumn(label: Text('Estado')),
-            DataColumn(label: Text('Alta')),
-            DataColumn(label: Text('Acciones')),
-          ],
-          rows: [
-            for (final user in users)
-              DataRow(
-                cells: [
-                  DataCell(
-                    Text(
-                      user.id == currentUserId
-                          ? '${user.username} (tú)'
-                          : user.username,
-                    ),
-                  ),
-                  DataCell(Text(user.fullName)),
-                  DataCell(Text(roleLabel(user.role))),
-                  DataCell(Text(user.storeCode ?? '—')),
-                  DataCell(
-                    Chip(
-                      label: Text(user.active ? 'Activo' : 'Inactivo'),
-                      visualDensity: VisualDensity.compact,
-                      backgroundColor: user.active
-                          ? Colors.green.withValues(alpha: 0.12)
-                          : Theme.of(
-                              context,
-                            ).colorScheme.error.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      user.createdAt == null
-                          ? '—'
-                          : dateFormat.format(user.createdAt!.toLocal()),
-                    ),
-                  ),
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          onPressed: () => onEdit(user),
-                          tooltip: 'Editar',
-                          icon: const Icon(Icons.edit_rounded),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Phones and tablets: one card per user; the table needs ~900 px.
+        if (constraints.maxWidth < _tableMinWidth) {
+          return ListView.separated(
+            itemCount: users.length,
+            separatorBuilder: (context, index) => const Divider(height: 20),
+            itemBuilder: (context, index) => _UserCard(
+              user: users[index],
+              isCurrentUser: users[index].id == currentUserId,
+              createdLabel: users[index].createdAt == null
+                  ? '—'
+                  : dateFormat.format(users[index].createdAt!.toLocal()),
+              onEdit: onEdit,
+              onResetPassword: onResetPassword,
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              // Tighter columns on laptops so "Acciones" stays visible.
+              columnSpacing: constraints.maxWidth < 1100 ? 28 : null,
+              columns: const [
+                DataColumn(label: Text('Usuario')),
+                DataColumn(label: Text('Nombre')),
+                DataColumn(label: Text('Rol')),
+                DataColumn(label: Text('Tienda')),
+                DataColumn(label: Text('Estado')),
+                DataColumn(label: Text('Alta')),
+                DataColumn(label: Text('Acciones')),
+              ],
+              rows: [
+                for (final user in users)
+                  DataRow(
+                    cells: [
+                      DataCell(
+                        Text(
+                          user.id == currentUserId
+                              ? '${user.username} (tú)'
+                              : user.username,
                         ),
-                        IconButton(
-                          onPressed: () => onResetPassword(user),
-                          tooltip: 'Restablecer contraseña',
-                          icon: const Icon(Icons.lock_reset_rounded),
+                      ),
+                      DataCell(Text(user.fullName)),
+                      DataCell(Text(roleLabel(user.role))),
+                      DataCell(Text(user.storeCode ?? '—')),
+                      DataCell(_UserStatusChip(active: user.active)),
+                      DataCell(
+                        Text(
+                          user.createdAt == null
+                              ? '—'
+                              : dateFormat.format(user.createdAt!.toLocal()),
                         ),
-                      ],
-                    ),
+                      ),
+                      DataCell(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              onPressed: () => onEdit(user),
+                              tooltip: 'Editar',
+                              icon: const Icon(Icons.edit_rounded),
+                            ),
+                            IconButton(
+                              onPressed: () => onResetPassword(user),
+                              tooltip: 'Restablecer contraseña',
+                              icon: const Icon(Icons.lock_reset_rounded),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Compact view of one user for phones and tablets.
+class _UserCard extends StatelessWidget {
+  const _UserCard({
+    required this.user,
+    required this.isCurrentUser,
+    required this.createdLabel,
+    required this.onEdit,
+    required this.onResetPassword,
+  });
+
+  final AppUser user;
+  final bool isCurrentUser;
+  final String createdLabel;
+  final ValueChanged<AppUser> onEdit;
+  final ValueChanged<AppUser> onResetPassword;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                user.fullName.isEmpty ? user.username : user.fullName,
+                style: textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(isCurrentUser ? '${user.username} (tú)' : user.username),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _UserStatusChip(active: user.active),
+                  Text(
+                    [
+                      roleLabel(user.role),
+                      user.storeCode ?? 'Sin tienda',
+                      'Alta $createdLabel',
+                    ].join(' · '),
+                    style: textTheme.bodySmall,
                   ),
                 ],
               ),
-          ],
+            ],
+          ),
         ),
-      ),
+        IconButton(
+          onPressed: () => onEdit(user),
+          tooltip: 'Editar',
+          icon: const Icon(Icons.edit_rounded),
+        ),
+        IconButton(
+          onPressed: () => onResetPassword(user),
+          tooltip: 'Restablecer contraseña',
+          icon: const Icon(Icons.lock_reset_rounded),
+        ),
+      ],
+    );
+  }
+}
+
+class _UserStatusChip extends StatelessWidget {
+  const _UserStatusChip({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      label: Text(active ? 'Activo' : 'Inactivo'),
+      visualDensity: VisualDensity.compact,
+      backgroundColor: active
+          ? Colors.green.withValues(alpha: 0.12)
+          : Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
     );
   }
 }
@@ -369,6 +472,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                 ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<UserRole>(
+                  isExpanded: true,
                   initialValue: _role,
                   decoration: const InputDecoration(labelText: 'Rol'),
                   items: [
@@ -381,6 +485,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String?>(
+                  isExpanded: true,
                   initialValue: _storeCode,
                   decoration: InputDecoration(
                     labelText: _role == UserRole.alumno
@@ -497,6 +602,7 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text('Restablecer contraseña de ${widget.user.username}'),
+      scrollable: true,
       content: SizedBox(
         width: 400,
         child: Form(
