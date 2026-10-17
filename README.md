@@ -2,9 +2,9 @@
 
 Herramienta web interna para capacitar y controlar al personal de las tiendas (Ofertas y Mexi).
 
-## Estado actual: v1.0.0
+## Estado actual: v1.1.0
 
-Primera versión en producción. Incluye:
+La app se adapta a celular y tablet, y las prácticas explican los errores y muestran notas e intentos al personal (ver [notas de la v1.1.0](docs/releases/v1.1.0.md)). Incluye:
 
 - **Inicio de sesión y 5 roles**: Administrador, Supervisor, Consulta gerencial, Auditor y Alumno/Cobrador. Los permisos se revisan en el servidor en cada acción.
 - **Usuarios** (Administrador): altas, rol, tienda, activar/desactivar y restablecer contraseña.
@@ -19,7 +19,7 @@ Requisitos: un servidor con Docker y Docker Compose, y un dominio con HTTPS dela
 
 ```bash
 git clone https://github.com/Beatriz75/hercules-control.git && cd hercules-control
-git checkout v1.0.0
+git checkout v1.1.0
 cp .env.example .env      # completar POSTGRES_PASSWORD, AUTH_SECRET_KEY e INITIAL_ADMIN_PASSWORD
 docker compose up -d --build
 docker compose ps         # db, backend y web en "running"; backend y web en "healthy"
