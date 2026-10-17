@@ -279,41 +279,29 @@ class _StaffCoursesViewState extends State<_StaffCoursesView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final crossAxisCount = constraints.maxWidth < 720 ? 1 : 3;
-
-                return GridView.count(
-                  crossAxisCount: crossAxisCount,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: crossAxisCount == 1 ? 3.6 : 2.65,
-                  children: [
-                    MetricCard(
-                      title: 'Cursos',
-                      value: '${visible.length}',
-                      caption: _storeFilter == null
-                          ? 'Todas las tiendas'
-                          : 'Asignados a $_storeFilter',
-                      icon: Icons.school_rounded,
-                    ),
-                    MetricCard(
-                      title: 'Publicados',
-                      value: '${published.length}',
-                      caption: 'Visibles para alumnos',
-                      icon: Icons.visibility_rounded,
-                    ),
-                    MetricCard(
-                      title: 'Lecciones',
-                      value: '$lessonCount',
-                      caption: 'En los cursos filtrados',
-                      icon: Icons.menu_book_rounded,
-                    ),
-                  ],
-                );
-              },
+            MetricCardGrid(
+              cards: [
+                MetricCard(
+                  title: 'Cursos',
+                  value: '${visible.length}',
+                  caption: _storeFilter == null
+                      ? 'Todas las tiendas'
+                      : 'Asignados a $_storeFilter',
+                  icon: Icons.school_rounded,
+                ),
+                MetricCard(
+                  title: 'Publicados',
+                  value: '${published.length}',
+                  caption: 'Visibles para alumnos',
+                  icon: Icons.visibility_rounded,
+                ),
+                MetricCard(
+                  title: 'Lecciones',
+                  value: '$lessonCount',
+                  caption: 'En los cursos filtrados',
+                  icon: Icons.menu_book_rounded,
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             AppPanel(

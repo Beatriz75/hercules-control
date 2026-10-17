@@ -357,7 +357,8 @@ class _RoadmapStep extends StatelessWidget {
         onTap: onOpen,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          width: 310,
+          // Full width on phones, cards side by side elsewhere.
+          width: context.isCompact ? double.infinity : 310,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
@@ -657,123 +658,120 @@ class _LessonPreviewDialog extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Dialog(
-      insetPadding: const EdgeInsets.all(24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _DialogTitle(
-                  overline: '${course.title} · Lección $lessonNumber',
-                  title: lesson.title,
-                ),
-                const SizedBox(height: 16),
-                Text(lesson.summary),
-                const SizedBox(height: 16),
-                _TheoryBlock(title: 'Teoría', body: lesson.theory),
-                if (lesson.theoryVideos.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _TheoryVideosBlock(videos: lesson.theoryVideos),
-                ],
-                if (lesson.theoryImageUrls.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _TheoryImagesBlock(imageUrls: lesson.theoryImageUrls),
-                ],
-                const SizedBox(height: 20),
-                Text(
-                  'Banco de preguntas · ${_bankLabel(lesson)} · aprueba con ${lesson.requiredApprovalPercent}%',
-                  style: textTheme.titleMedium,
-                ),
-                const SizedBox(height: 10),
-                for (final question in lesson.questions.indexed) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: colorScheme.outlineVariant),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${question.$1 + 1}. ${question.$2.prompt}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        if (question.$2.hasVideo) ...[
-                          const SizedBox(height: 6),
-                          const _VideoChip(),
-                          const SizedBox(height: 8),
-                          VideoEmbed(url: question.$2.videoUrl!),
-                        ],
-                        if (question.$2.type == QuestionType.image &&
-                            (question.$2.imageUrl ?? '').isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          _QuestionImage(
-                            url: question.$2.imageUrl!,
-                            maxHeight: 240,
-                          ),
-                        ],
-                        const SizedBox(height: 6),
-                        Text(
-                          question.$2.answerMode == AnswerMode.multiple
-                              ? 'Selección múltiple'
-                              : 'Selección simple',
-                          style: textTheme.labelMedium,
-                        ),
-                        const SizedBox(height: 6),
-                        for (final option in question.$2.options)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  option.isCorrect
-                                      ? Icons.check_circle_rounded
-                                      : Icons.radio_button_unchecked_rounded,
-                                  size: 18,
-                                  color: option.isCorrect
-                                      ? BrandColors.success
-                                      : colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(option.label)),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    if (onEdit != null)
-                      FilledButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          onEdit!();
-                        },
-                        icon: const Icon(Icons.edit_note_rounded),
-                        label: const Text('Editar lección'),
-                      ),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                      label: const Text('Cerrar'),
-                    ),
-                  ],
-                ),
+    return ResponsiveDialog(
+      maxWidth: 760,
+      child: Padding(
+        padding: EdgeInsets.all(context.dialogPadding),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DialogTitle(
+                overline: '${course.title} · Lección $lessonNumber',
+                title: lesson.title,
+              ),
+              const SizedBox(height: 16),
+              Text(lesson.summary),
+              const SizedBox(height: 16),
+              _TheoryBlock(title: 'Teoría', body: lesson.theory),
+              if (lesson.theoryVideos.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _TheoryVideosBlock(videos: lesson.theoryVideos),
               ],
-            ),
+              if (lesson.theoryImageUrls.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _TheoryImagesBlock(imageUrls: lesson.theoryImageUrls),
+              ],
+              const SizedBox(height: 20),
+              Text(
+                'Banco de preguntas · ${_bankLabel(lesson)} · aprueba con ${lesson.requiredApprovalPercent}%',
+                style: textTheme.titleMedium,
+              ),
+              const SizedBox(height: 10),
+              for (final question in lesson.questions.indexed) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: colorScheme.outlineVariant),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${question.$1 + 1}. ${question.$2.prompt}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      if (question.$2.hasVideo) ...[
+                        const SizedBox(height: 6),
+                        const _VideoChip(),
+                        const SizedBox(height: 8),
+                        VideoEmbed(url: question.$2.videoUrl!),
+                      ],
+                      if (question.$2.type == QuestionType.image &&
+                          (question.$2.imageUrl ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _QuestionImage(
+                          url: question.$2.imageUrl!,
+                          maxHeight: 240,
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Text(
+                        question.$2.answerMode == AnswerMode.multiple
+                            ? 'Selección múltiple'
+                            : 'Selección simple',
+                        style: textTheme.labelMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      for (final option in question.$2.options)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              Icon(
+                                option.isCorrect
+                                    ? Icons.check_circle_rounded
+                                    : Icons.radio_button_unchecked_rounded,
+                                size: 18,
+                                color: option.isCorrect
+                                    ? BrandColors.success
+                                    : colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(option.label)),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  if (onEdit != null)
+                    FilledButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onEdit!();
+                      },
+                      icon: const Icon(Icons.edit_note_rounded),
+                      label: const Text('Editar lección'),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                    label: const Text('Cerrar'),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -880,74 +878,71 @@ class _QuestionExportDialogState extends State<_QuestionExportDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: const EdgeInsets.all(24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _DialogTitle(
-                overline: 'Exportador',
-                title: 'Exportar preguntas por lección',
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Selecciona una o varias lecciones. El export se copia en formato Markdown.',
-              ),
-              const SizedBox(height: 16),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      for (final lesson in widget.course.lessons.indexed)
-                        CheckboxListTile(
-                          value: _selectedLessonIndexes.contains(lesson.$1),
-                          onChanged: (selected) {
-                            setState(() {
-                              if (selected ?? false) {
-                                _selectedLessonIndexes.add(lesson.$1);
-                              } else if (_selectedLessonIndexes.length > 1) {
-                                _selectedLessonIndexes.remove(lesson.$1);
-                              }
-                            });
-                          },
-                          title: Text(
-                            'Lección ${lesson.$1 + 1}: ${lesson.$2.title}',
-                          ),
-                          subtitle: Text(
-                            '${lesson.$2.questions.length} preguntas',
-                          ),
-                          controlAffinity: ListTileControlAffinity.leading,
+    return ResponsiveDialog(
+      maxWidth: 720,
+      child: Padding(
+        padding: EdgeInsets.all(context.dialogPadding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _DialogTitle(
+              overline: 'Exportador',
+              title: 'Exportar preguntas por lección',
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Selecciona una o varias lecciones. El export se copia en formato Markdown.',
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    for (final lesson in widget.course.lessons.indexed)
+                      CheckboxListTile(
+                        value: _selectedLessonIndexes.contains(lesson.$1),
+                        onChanged: (selected) {
+                          setState(() {
+                            if (selected ?? false) {
+                              _selectedLessonIndexes.add(lesson.$1);
+                            } else if (_selectedLessonIndexes.length > 1) {
+                              _selectedLessonIndexes.remove(lesson.$1);
+                            }
+                          });
+                        },
+                        title: Text(
+                          'Lección ${lesson.$1 + 1}: ${lesson.$2.title}',
                         ),
-                    ],
-                  ),
+                        subtitle: Text(
+                          '${lesson.$2.questions.length} preguntas',
+                        ),
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  FilledButton.icon(
-                    onPressed: _selectedLessonIndexes.isEmpty
-                        ? null
-                        : () => _copyExport(context),
-                    icon: const Icon(Icons.copy_rounded),
-                    label: const Text('Copiar export'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                    label: const Text('Cerrar'),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton.icon(
+                  onPressed: _selectedLessonIndexes.isEmpty
+                      ? null
+                      : () => _copyExport(context),
+                  icon: const Icon(Icons.copy_rounded),
+                  label: const Text('Copiar export'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('Cerrar'),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

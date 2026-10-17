@@ -102,7 +102,7 @@ class _CourseProgressViewState extends State<_CourseProgressView> {
                   onSelected: (_) => setState(() => _storeFilter = store),
                 ),
               SizedBox(
-                width: 280,
+                width: context.isCompact ? double.infinity : 280,
                 child: TextField(
                   decoration: const InputDecoration(
                     isDense: true,
@@ -116,76 +116,137 @@ class _CourseProgressViewState extends State<_CourseProgressView> {
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: rows.isEmpty
-                ? const _EmptyState(
-                    icon: Icons.insights_rounded,
-                    message:
-                        'Todavía no hay avance registrado para este filtro.',
-                  )
-                : SingleChildScrollView(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('Alumno')),
-                          DataColumn(label: Text('Tienda')),
-                          DataColumn(label: Text('Curso')),
-                          DataColumn(label: Text('Lecciones completadas')),
-                          DataColumn(label: Text('Última actividad')),
-                        ],
-                        rows: [
-                          for (final row in rows)
-                            DataRow(
-                              cells: [
-                                DataCell(
-                                  Text(
-                                    row.fullName.isEmpty
-                                        ? row.username
-                                        : '${row.fullName} (${row.username})',
-                                  ),
-                                ),
-                                DataCell(Text(row.storeCode ?? '—')),
-                                DataCell(Text(row.courseTitle)),
-                                DataCell(
-                                  SizedBox(
-                                    width: 180,
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: LinearProgressIndicator(
-                                            value: row.lessonsTotal == 0
-                                                ? 0
-                                                : row.lessonsCompleted /
-                                                      row.lessonsTotal,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Text(
-                                          '${row.lessonsCompleted}/${row.lessonsTotal}',
-                                        ),
-                                      ],
+            // Phones and tablets get cards; the table needs ~860 px.
+            child: LayoutBuilder(
+              builder: (context, constraints) => rows.isEmpty
+                  ? const _EmptyState(
+                      icon: Icons.insights_rounded,
+                      message:
+                          'Todavía no hay avance registrado para este filtro.',
+                    )
+                  : constraints.maxWidth < 860
+                  ? ListView.separated(
+                      itemCount: rows.length,
+                      separatorBuilder: (context, index) =>
+                          const Divider(height: 20),
+                      itemBuilder: (context, index) => _ProgressRowCard(
+                        row: rows[index],
+                        lastActivity: rows[index].lastActivity == null
+                            ? 'Sin actividad'
+                            : _formatDateTime(
+                                dateFormat,
+                                rows[index].lastActivity!.toLocal(),
+                              ),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          columns: const [
+                            DataColumn(label: Text('Alumno')),
+                            DataColumn(label: Text('Tienda')),
+                            DataColumn(label: Text('Curso')),
+                            DataColumn(label: Text('Lecciones completadas')),
+                            DataColumn(label: Text('Última actividad')),
+                          ],
+                          rows: [
+                            for (final row in rows)
+                              DataRow(
+                                cells: [
+                                  DataCell(
+                                    Text(
+                                      row.fullName.isEmpty
+                                          ? row.username
+                                          : '${row.fullName} (${row.username})',
                                     ),
                                   ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    row.lastActivity == null
-                                        ? 'Sin actividad'
-                                        : _formatDateTime(
-                                            dateFormat,
-                                            row.lastActivity!.toLocal(),
+                                  DataCell(Text(row.storeCode ?? '—')),
+                                  DataCell(Text(row.courseTitle)),
+                                  DataCell(
+                                    SizedBox(
+                                      width: 180,
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: LinearProgressIndicator(
+                                              value: row.lessonsTotal == 0
+                                                  ? 0
+                                                  : row.lessonsCompleted /
+                                                        row.lessonsTotal,
+                                            ),
                                           ),
+                                          const SizedBox(width: 10),
+                                          Text(
+                                            '${row.lessonsCompleted}/${row.lessonsTotal}',
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                        ],
+                                  DataCell(
+                                    Text(
+                                      row.lastActivity == null
+                                          ? 'Sin actividad'
+                                          : _formatDateTime(
+                                              dateFormat,
+                                              row.lastActivity!.toLocal(),
+                                            ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One student's progress as a card, used instead of the table when narrow.
+class _ProgressRowCard extends StatelessWidget {
+  const _ProgressRowCard({required this.row, required this.lastActivity});
+
+  final CourseProgressRow row;
+  final String lastActivity;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          row.fullName.isEmpty
+              ? row.username
+              : '${row.fullName} (${row.username})',
+          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 2),
+        Text('${row.storeCode ?? '—'} · ${row.courseTitle}'),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: LinearProgressIndicator(
+                value: row.lessonsTotal == 0
+                    ? 0
+                    : row.lessonsCompleted / row.lessonsTotal,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text('${row.lessonsCompleted}/${row.lessonsTotal}'),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text('Última actividad: $lastActivity', style: textTheme.bodySmall),
+      ],
     );
   }
 }

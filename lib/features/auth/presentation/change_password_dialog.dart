@@ -54,6 +54,7 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Cambiar contraseña'),
+      scrollable: true,
       content: SizedBox(
         width: 400,
         child: Form(

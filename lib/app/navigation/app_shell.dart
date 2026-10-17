@@ -4,6 +4,7 @@ import 'package:hercules_control/app/navigation/app_section.dart';
 import 'package:hercules_control/app/navigation/shell_navigation.dart';
 import 'package:hercules_control/core/auth/auth_scope.dart';
 import 'package:hercules_control/core/auth/current_user.dart';
+import 'package:hercules_control/core/layout/breakpoints.dart';
 import 'package:hercules_control/core/theme/app_theme.dart';
 import 'package:hercules_control/core/widgets/brand_logo.dart';
 import 'package:hercules_control/features/audits/presentation/audits_page.dart';
@@ -36,7 +37,9 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  bool _collapsed = false;
+  /// Sidebar width chosen by the user. Null follows the screen: collapsed on
+  /// tablets, expanded on desktop.
+  bool? _collapsedOverride;
 
   Widget _pageFor(AppSection section) {
     return switch (section) {
@@ -57,6 +60,13 @@ class _AppShellState extends State<AppShell> {
     };
   }
 
+  void _select(AppSection section) {
+    setState(() {
+      _active = section;
+      _focusCourseId = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = AuthScope.of(context);
@@ -67,6 +77,82 @@ class _AppShellState extends State<AppShell> {
         : routes.isEmpty
         ? null
         : routes.first.section;
+    final windowSize = context.windowSize;
+    final compact = windowSize == WindowSize.compact;
+
+    final content = SafeArea(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        child: Container(
+          key: ValueKey(active),
+          padding: EdgeInsets.all(context.pagePadding),
+          child: active == null ? const _NoModulesView() : _pageFor(active),
+        ),
+      ),
+    );
+
+    // Phones: app bar with a hamburger button and the menu in a drawer.
+    if (compact) {
+      String? activeLabel;
+      for (final route in routes) {
+        if (route.section == active) activeLabel = route.label;
+      }
+
+      final theme = Theme.of(context);
+
+      return ShellNavigation(
+        goTo: _goTo,
+        // Narrower side margins for every dialog opened on a phone.
+        child: Theme(
+          data: theme.copyWith(
+            dialogTheme: theme.dialogTheme.copyWith(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
+            ),
+          ),
+          child: Scaffold(
+            appBar: AppBar(
+              titleSpacing: 0,
+              title: Row(
+                children: [
+                  const BrandMark(size: 32),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      activeLabel ?? 'Hércules Control',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            drawer: Drawer(
+              backgroundColor: BrandColors.navy,
+              child: Builder(
+                builder: (drawerContext) => _SidebarContent(
+                  collapsed: false,
+                  routes: routes,
+                  active: active,
+                  user: user,
+                  onSelect: (section) {
+                    Navigator.of(drawerContext).pop();
+                    _select(section);
+                  },
+                ),
+              ),
+            ),
+            body: content,
+          ),
+        ),
+      );
+    }
+
+    final collapsed = _collapsedOverride ?? windowSize == WindowSize.medium;
+    final sidebarWidth = collapsed ? 84.0 : 248.0;
 
     return ShellNavigation(
       goTo: _goTo,
@@ -75,92 +161,113 @@ class _AppShellState extends State<AppShell> {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 220),
-              width: _collapsed ? 84 : 248,
+              width: sidebarWidth,
               color: BrandColors.navy,
-              child: SafeArea(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        _collapsed ? 8 : 16,
-                        16,
-                        _collapsed ? 8 : 8,
-                        24,
-                      ),
-                      child: Flex(
-                        direction: _collapsed ? Axis.vertical : Axis.horizontal,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const BrandMark(size: 44),
-                          if (!_collapsed) ...[
-                            const SizedBox(width: 10),
-                            const Expanded(
-                              child: BrandWordmark(
-                                fontSize: 17,
-                                titleColor: Colors.white,
-                              ),
-                            ),
-                          ],
-                          IconButton(
-                            onPressed: () {
-                              setState(() {
-                                _collapsed = !_collapsed;
-                              });
-                            },
-                            tooltip: _collapsed
-                                ? 'Expandir menú'
-                                : 'Contraer menú',
-                            icon: Icon(
-                              _collapsed
-                                  ? Icons.keyboard_double_arrow_right_rounded
-                                  : Icons.keyboard_double_arrow_left_rounded,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        children: [
-                          for (final route in routes)
-                            _SidebarTile(
-                              collapsed: _collapsed,
-                              selected: active == route.section,
-                              icon: _iconForSection(route.section),
-                              label: route.label,
-                              onTap: () {
-                                setState(() {
-                                  _active = route.section;
-                                  _focusCourseId = null;
-                                });
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                    _UserPanel(collapsed: _collapsed, user: user),
-                  ],
-                ),
-              ),
-            ),
-            Expanded(
-              child: SafeArea(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: Container(
-                    key: ValueKey(active),
-                    padding: const EdgeInsets.all(24),
-                    child: active == null
-                        ? const _NoModulesView()
-                        : _pageFor(active),
+              // The content is laid out at its final width and clipped while
+              // the width animates, so it never overflows mid-animation.
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.centerLeft,
+                  minWidth: sidebarWidth,
+                  maxWidth: sidebarWidth,
+                  child: _SidebarContent(
+                    collapsed: collapsed,
+                    routes: routes,
+                    active: active,
+                    user: user,
+                    onSelect: _select,
+                    onToggleCollapsed: () =>
+                        setState(() => _collapsedOverride = !collapsed),
                   ),
                 ),
               ),
             ),
+            Expanded(child: content),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Brand, module list and user panel. Used by the desktop sidebar and by the
+/// drawer on phones.
+class _SidebarContent extends StatelessWidget {
+  const _SidebarContent({
+    required this.collapsed,
+    required this.routes,
+    required this.active,
+    required this.user,
+    required this.onSelect,
+    this.onToggleCollapsed,
+  });
+
+  final bool collapsed;
+  final List<AppRouteDefinition> routes;
+  final AppSection? active;
+  final CurrentUser user;
+  final ValueChanged<AppSection> onSelect;
+
+  /// Null hides the collapse button (drawer).
+  final VoidCallback? onToggleCollapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              collapsed ? 8 : 16,
+              16,
+              collapsed ? 8 : 8,
+              24,
+            ),
+            child: Flex(
+              direction: collapsed ? Axis.vertical : Axis.horizontal,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const BrandMark(size: 44),
+                if (!collapsed) ...[
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: BrandWordmark(
+                      fontSize: 17,
+                      titleColor: Colors.white,
+                    ),
+                  ),
+                ],
+                if (onToggleCollapsed != null)
+                  IconButton(
+                    onPressed: onToggleCollapsed,
+                    tooltip: collapsed ? 'Expandir menú' : 'Contraer menú',
+                    icon: Icon(
+                      collapsed
+                          ? Icons.keyboard_double_arrow_right_rounded
+                          : Icons.keyboard_double_arrow_left_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                for (final route in routes)
+                  _SidebarTile(
+                    collapsed: collapsed,
+                    selected: active == route.section,
+                    icon: _iconForSection(route.section),
+                    label: route.label,
+                    onTap: () => onSelect(route.section),
+                  ),
+              ],
+            ),
+          ),
+          _UserPanel(collapsed: collapsed, user: user),
+        ],
       ),
     );
   }
@@ -293,7 +400,7 @@ class _SidebarTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final tile = Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: selected ? BrandColors.navyLight : Colors.transparent,
@@ -351,6 +458,9 @@ class _SidebarTile extends StatelessWidget {
         ),
       ),
     );
+
+    // Collapsed: only the icon is visible, the tooltip names the module.
+    return collapsed ? Tooltip(message: label, child: tile) : tile;
   }
 }
 
