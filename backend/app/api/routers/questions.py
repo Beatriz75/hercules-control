@@ -36,6 +36,7 @@ def _row(question: TrainingQuestion) -> QuestionBankRow:
         answer_mode=question.answer_mode,
         image_url=question.image_url,
         video_url=question.video_url,
+        explanation=question.explanation,
         sort_order=question.sort_order,
         options=question.options,
         lesson_id=lesson.id,

@@ -46,6 +46,15 @@ class TrainingAnswer(Base):
         order_by="TrainingAnswerOption.id",
     )
 
+    # Read after grading: what the right answer was and why (the question's current state).
+    @property
+    def correct_option_ids(self) -> list[int]:
+        return [option.id for option in self.question.options if option.is_correct]
+
+    @property
+    def explanation(self) -> str | None:
+        return self.question.explanation
+
 
 class TrainingAnswerOption(Base):
     __tablename__ = "training_answer_options"

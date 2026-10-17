@@ -144,6 +144,7 @@ class PracticeQuestion {
     this.imageUrl,
     this.videoUrl,
     this.code,
+    this.explanation,
   });
 
   factory PracticeQuestion.blank() => const PracticeQuestion(
@@ -174,6 +175,7 @@ class PracticeQuestion {
       imageUrl: json['image_url'] as String?,
       videoUrl: _emptyToNull(json['video_url'] as String?),
       code: normalizeQuestionCode(json['code'] as String?),
+      explanation: _emptyToNull(json['explanation'] as String?),
       options: [for (final option in options) QuestionOption.fromJson(option)],
     );
   }
@@ -193,6 +195,9 @@ class PracticeQuestion {
   /// Optional visible code (e.g. "P97"), upper-case and without spaces.
   final String? code;
 
+  /// Why the right answer is right; the student sees it after submitting.
+  final String? explanation;
+
   List<int> get correctOptionIndexes => [
     for (final option in options.indexed)
       if (option.$2.isCorrect) option.$1,
@@ -211,10 +216,13 @@ class PracticeQuestion {
     bool clearVideoUrl = false,
     String? code,
     bool clearCode = false,
+    String? explanation,
+    bool clearExplanation = false,
   }) {
     return PracticeQuestion(
       id: id,
       code: clearCode ? null : code ?? this.code,
+      explanation: clearExplanation ? null : explanation ?? this.explanation,
       prompt: prompt ?? this.prompt,
       options: options ?? this.options,
       type: type ?? this.type,
@@ -229,6 +237,7 @@ class PracticeQuestion {
   PracticeQuestion withoutIds() {
     return PracticeQuestion(
       code: code,
+      explanation: explanation,
       prompt: prompt,
       type: type,
       answerMode: answerMode,
@@ -246,6 +255,7 @@ class PracticeQuestion {
     'answer_mode': answerMode.code,
     'image_url': type == QuestionType.image ? _emptyToNull(imageUrl) : null,
     'video_url': _emptyToNull(videoUrl?.trim()),
+    'explanation': _emptyToNull(explanation?.trim()),
     'sort_order': sortOrder,
     'options': [
       for (final option in options.indexed) option.$2.toPayload(option.$1 + 1),
@@ -672,18 +682,26 @@ class TrainingAttemptResult {
     required this.requiredApprovalPercent,
     required this.approved,
     required this.correctByQuestionId,
+    this.reviewByQuestionId = const {},
   });
 
   factory TrainingAttemptResult.fromJson(Map<String, dynamic> json) {
+    final answers = [
+      for (final answer in (json['answers'] as List? ?? const []))
+        answer as Map<String, dynamic>,
+    ];
     return TrainingAttemptResult(
       lessonId: json['lesson_id'] as int,
       scorePercent: (json['score_percent'] as num).toDouble(),
       requiredApprovalPercent: json['required_approval_percent'] as int,
       approved: json['approved'] as bool,
       correctByQuestionId: {
-        for (final answer in (json['answers'] as List? ?? const []))
-          (answer as Map<String, dynamic>)['question_id'] as int:
-              answer['is_correct'] as bool,
+        for (final answer in answers)
+          answer['question_id'] as int: answer['is_correct'] as bool,
+      },
+      reviewByQuestionId: {
+        for (final answer in answers)
+          answer['question_id'] as int: AnswerReview.fromJson(answer),
       },
     );
   }
@@ -694,8 +712,36 @@ class TrainingAttemptResult {
   final bool approved;
   final Map<int, bool> correctByQuestionId;
 
+  /// What the student chose, the right options and the explanation.
+  final Map<int, AnswerReview> reviewByQuestionId;
+
   int get correctAnswers =>
       correctByQuestionId.values.where((correct) => correct).length;
+}
+
+/// One graded answer, as returned after submitting a practice.
+class AnswerReview {
+  const AnswerReview({
+    required this.selectedOptionIds,
+    required this.correctOptionIds,
+    this.explanation,
+  });
+
+  factory AnswerReview.fromJson(Map<String, dynamic> json) => AnswerReview(
+    selectedOptionIds: [
+      for (final option in (json['selected_options'] as List? ?? const []))
+        (option as Map<String, dynamic>)['option_id'] as int,
+    ],
+    correctOptionIds: [
+      for (final id in (json['correct_option_ids'] as List? ?? const []))
+        id as int,
+    ],
+    explanation: _emptyToNull(json['explanation'] as String?),
+  );
+
+  final List<int> selectedOptionIds;
+  final List<int> correctOptionIds;
+  final String? explanation;
 }
 
 /// Row of `GET /courses/progress`.

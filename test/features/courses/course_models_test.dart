@@ -512,4 +512,48 @@ void main() {
       'Lección 1, pregunta 1: El video debe ser un enlace de YouTube, Google Drive, Vimeo, un archivo .mp4 / .webm o un video subido a Hércules.',
     ]);
   });
+
+  test('question explanation round-trips and attempt answers carry review', () {
+    final question = PracticeQuestion.fromJson({
+      'id': 5,
+      'prompt': 'P',
+      'explanation': 'Porque así lo dice la guía.',
+      'options': [
+        {'id': 1, 'label': 'A', 'is_correct': true, 'sort_order': 1},
+        {'id': 2, 'label': 'B', 'is_correct': false, 'sort_order': 2},
+      ],
+    });
+    expect(question.explanation, 'Porque así lo dice la guía.');
+    expect(
+      question.copyWith(explanation: '  Otra  ').toPayload(1)['explanation'],
+      'Otra',
+    );
+    expect(
+      question.copyWith(clearExplanation: true).toPayload(1)['explanation'],
+      isNull,
+    );
+    expect(question.withoutIds().explanation, question.explanation);
+
+    final result = TrainingAttemptResult.fromJson({
+      'lesson_id': 1,
+      'score_percent': 0,
+      'required_approval_percent': 80,
+      'approved': false,
+      'answers': [
+        {
+          'question_id': 5,
+          'is_correct': false,
+          'selected_options': [
+            {'id': 1, 'option_id': 2},
+          ],
+          'correct_option_ids': [1],
+          'explanation': 'Porque así lo dice la guía.',
+        },
+      ],
+    });
+    final review = result.reviewByQuestionId[5]!;
+    expect(review.selectedOptionIds, [2]);
+    expect(review.correctOptionIds, [1]);
+    expect(review.explanation, 'Porque así lo dice la guía.');
+  });
 }

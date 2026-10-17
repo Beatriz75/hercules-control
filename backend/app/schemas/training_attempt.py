@@ -40,6 +40,8 @@ class TrainingAnswerRead(BaseModel):
     question_id: int
     is_correct: bool
     selected_options: list[TrainingAnswerOptionRead]
+    correct_option_ids: list[int]
+    explanation: str | None
 
 
 class TrainingAttemptRead(BaseModel):

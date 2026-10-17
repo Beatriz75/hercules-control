@@ -161,6 +161,10 @@ Future<AuthController> _signIn(
               'question_id': answer['question_id'],
               'is_correct': _approveAttempts || answer['question_id'] == 113,
               'selected_options': [],
+              'correct_option_ids': [(answer['question_id'] as int) * 10 + 1],
+              'explanation': answer['question_id'] == 111
+                  ? 'Explicación 1'
+                  : null,
             },
         ],
       }, 201);
@@ -395,6 +399,10 @@ void main() {
     await _settle(tester);
 
     expect(find.textContaining('No aprobado: 50%'), findsOneWidget);
+    // The wrong answer shows the right one and why; the right one does not.
+    expect(find.text('Respuesta correcta: Correcta 1'), findsOneWidget);
+    expect(find.text('Por qué: Explicación 1'), findsOneWidget);
+    expect(find.textContaining('Respuesta correcta: Correcta 3'), findsNothing);
     await tester.tap(find.text('Intentar de nuevo'));
     await _settle(tester);
 
@@ -525,12 +533,13 @@ void main() {
     await tester.tap(add);
     await _settle(tester);
 
-    // Last card: question text, option 1, option 2.
+    // Last card: question text, option 1, option 2, explanation.
     final fields = find.byType(TextFormField);
     final count = tester.widgetList(fields).length;
-    await tester.enterText(fields.at(count - 3), '¿Cómo valido un SPEI?');
-    await tester.enterText(fields.at(count - 2), 'En Banxico');
-    await tester.enterText(fields.at(count - 1), 'No se valida');
+    await tester.enterText(fields.at(count - 4), '¿Cómo valido un SPEI?');
+    await tester.enterText(fields.at(count - 3), 'En Banxico');
+    await tester.enterText(fields.at(count - 2), 'No se valida');
+    await tester.enterText(fields.at(count - 1), 'Se revisa en Banxico.');
     await tester.pump();
     await tester.tap(find.text('Guardar curso'));
     await _settle(tester);
@@ -562,6 +571,14 @@ void main() {
     await tester.tap(find.text('Guardar de todos modos'));
     await _settle(tester);
     expect(_coursePuts, hasLength(1));
+    final savedQuestions = [
+      for (final lesson in _coursePuts.single['lessons'] as List)
+        ...(lesson as Map<String, dynamic>)['questions'] as List,
+    ];
+    final saved = savedQuestions.cast<Map<String, dynamic>>().singleWhere(
+      (question) => question['prompt'] == '¿Cómo valido un SPEI?',
+    );
+    expect(saved['explanation'], 'Se revisa en Banxico.');
     expect(tester.takeException(), isNull);
   });
 

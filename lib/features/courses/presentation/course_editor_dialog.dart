@@ -1706,6 +1706,26 @@ class _QuestionEditorCard extends StatelessWidget {
           const Text(
             'En respuesta simple, sólo una opción queda como Correcta. En selección múltiple, puedes marcar varias opciones correctas.',
           ),
+          const SizedBox(height: 12),
+          const _EditorFieldLabel('Explicación de la respuesta (opcional)'),
+          const SizedBox(height: 6),
+          TextFormField(
+            key: ValueKey('practice-explanation-$lessonIndex-$number'),
+            initialValue: question.explanation ?? '',
+            minLines: 2,
+            maxLines: 5,
+            maxLength: 4000,
+            decoration: fieldDecoration().copyWith(
+              hintText:
+                  'Por qué la respuesta correcta es la correcta. El cobrador la ve al terminar la práctica.',
+              prefixIcon: const Icon(Icons.lightbulb_outline_rounded),
+            ),
+            onChanged: (value) => onChanged(
+              value.trim().isEmpty
+                  ? question.copyWith(clearExplanation: true)
+                  : question.copyWith(explanation: value),
+            ),
+          ),
         ],
       ),
     );
