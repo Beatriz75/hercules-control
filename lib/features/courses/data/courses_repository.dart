@@ -96,6 +96,46 @@ class CoursesRepository {
     ];
   }
 
+  /// One student's attempts, newest first (courses.progress.view).
+  Future<List<AttemptReview>> fetchStudentAttempts(
+    String username, {
+    int? courseId,
+  }) async {
+    final json =
+        await _api.get(
+              '/training-attempts/review',
+              query: {
+                'employee_reference': username,
+                if (courseId != null) 'course_id': '$courseId',
+              },
+            )
+            as List;
+    return [
+      for (final item in json)
+        AttemptReview.fromJson(item as Map<String, dynamic>),
+    ];
+  }
+
+  /// Questions students fail the most (courses.progress.view).
+  Future<List<MissedQuestionRow>> fetchMissedQuestions({
+    int? courseId,
+    String? storeCode,
+  }) async {
+    final json =
+        await _api.get(
+              '/training-attempts/missed-questions',
+              query: {
+                if (courseId != null) 'course_id': '$courseId',
+                'store_code': ?storeCode,
+              },
+            )
+            as List;
+    return [
+      for (final item in json)
+        MissedQuestionRow.fromJson(item as Map<String, dynamic>),
+    ];
+  }
+
   /// Every active question of every course (courses.view).
   Future<List<QuestionBankRow>> fetchQuestionBank({
     int? courseId,

@@ -87,6 +87,8 @@ http.Response _json(Object body, [int status = 200]) => http.Response(
 
 final _starts = <Map<String, dynamic>>[];
 final _coursePuts = <Map<String, dynamic>>[];
+final _reviewQueries = <Map<String, String>>[];
+final _missedQueries = <Map<String, String>>[];
 final _similarPrompts = <String>[];
 var _similarFails = false;
 final _attempts = <Map<String, dynamic>>[];
@@ -119,6 +121,60 @@ Future<AuthController> _signIn(
     if (request.method == 'PUT' && path.endsWith('/courses/1')) {
       _coursePuts.add(jsonDecode(request.body) as Map<String, dynamic>);
       return _json(_course(student: false));
+    }
+    if (path.endsWith('/training-attempts/review')) {
+      _reviewQueries.add(request.url.queryParameters);
+      return _json([
+        {
+          'id': 9,
+          'employee_reference': 'ana',
+          'course_id': 1,
+          'course_title': 'Ruta Mexi',
+          'lesson_id': 10,
+          'lesson_title': 'Lección 10',
+          'lesson_sort_order': 1,
+          'attempt_number': 1,
+          'created_at': '2026-10-12T15:30:00',
+          'score_percent': 50.0,
+          'required_approval_percent': 80,
+          'approved': false,
+          'answers': [
+            {
+              'question_id': 101,
+              'code': 'P12',
+              'prompt': '¿Dónde se valida un SPEI?',
+              'is_correct': false,
+              'selected_labels': ['En OXXO'],
+              'correct_labels': ['En Banxico'],
+            },
+            {
+              'question_id': 102,
+              'code': null,
+              'prompt': '¿Se guarda la cuenta?',
+              'is_correct': true,
+              'selected_labels': ['No'],
+              'correct_labels': ['No'],
+            },
+          ],
+        },
+      ]);
+    }
+    if (path.endsWith('/training-attempts/missed-questions')) {
+      _missedQueries.add(request.url.queryParameters);
+      return _json([
+        {
+          'question_id': 101,
+          'code': 'P12',
+          'prompt': '¿Dónde se valida un SPEI?',
+          'course_id': 1,
+          'course_title': 'Ruta Mexi',
+          'lesson_id': 10,
+          'lesson_title': 'Lección 10',
+          'times_answered': 4,
+          'times_failed': 3,
+          'fail_percent': 75.0,
+        },
+      ]);
     }
     if (path.endsWith('/training-attempts/start')) {
       final body = jsonDecode(request.body) as Map<String, dynamic>;
@@ -262,6 +318,8 @@ void main() {
     _attempts.clear();
     _approveAttempts = true;
     _coursePuts.clear();
+    _reviewQueries.clear();
+    _missedQueries.clear();
     _similarPrompts.clear();
     _similarFails = false;
   });
@@ -514,6 +572,65 @@ void main() {
     await _settle(tester);
     expect(find.text('1/2'), findsOneWidget);
     expect(find.text('12/10/2026 3:30 p. m.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('supervisor sees a student attempts and what was wrong', (
+    tester,
+  ) async {
+    final auth = await _signIn(tester, 'supervisor', [
+      'courses.view',
+      'courses.progress.view',
+    ]);
+    await _pumpShell(tester, auth);
+    await tester.tap(find.text('Avance de alumnos'));
+    await _settle(tester);
+
+    await tester.tap(find.text('Ver intentos'));
+    await _settle(tester);
+    expect(_reviewQueries, [
+      {'employee_reference': 'ana', 'course_id': '1'},
+    ]);
+    expect(find.text('Intentos de Ana'), findsOneWidget);
+    expect(find.text('Lección 1: Lección 10'), findsOneWidget);
+    expect(
+      find.textContaining('No aprobado: 50% (1/2 correctas, mínimo 80%)'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Lección 1: Lección 10'));
+    await _settle(tester);
+    expect(find.text('P12 · ¿Dónde se valida un SPEI?'), findsOneWidget);
+    expect(find.text('Respondió: En OXXO'), findsOneWidget);
+    expect(find.text('Correcta: En Banxico'), findsOneWidget);
+    // Right answers do not repeat the correct option.
+    expect(find.text('Correcta: No'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('supervisor sees the most missed questions by store', (
+    tester,
+  ) async {
+    final auth = await _signIn(tester, 'supervisor', [
+      'courses.view',
+      'courses.progress.view',
+    ]);
+    await _pumpShell(tester, auth);
+    await tester.tap(find.text('Avance de alumnos'));
+    await _settle(tester);
+
+    await tester.tap(find.text('Preguntas más falladas'));
+    await _settle(tester);
+    expect(find.text('75%'), findsOneWidget);
+    expect(find.text('P12 · ¿Dónde se valida un SPEI?'), findsOneWidget);
+    expect(find.text('Falló 3 de 4 · Ruta Mexi · Lección 10'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Mexi'));
+    await _settle(tester);
+    expect(_missedQueries, [
+      <String, String>{},
+      {'store_code': 'Mexi'},
+    ]);
     expect(tester.takeException(), isNull);
   });
 

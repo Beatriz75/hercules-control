@@ -782,3 +782,126 @@ class CourseProgressRow {
   final int lessonsCompleted;
   final DateTime? lastActivity;
 }
+
+/// One answered question inside [AttemptReview].
+class AnswerReviewRow {
+  const AnswerReviewRow({
+    required this.questionId,
+    required this.code,
+    required this.prompt,
+    required this.isCorrect,
+    required this.selectedLabels,
+    required this.correctLabels,
+  });
+
+  factory AnswerReviewRow.fromJson(Map<String, dynamic> json) =>
+      AnswerReviewRow(
+        questionId: json['question_id'] as int,
+        code: normalizeQuestionCode(json['code'] as String?),
+        prompt: (json['prompt'] as String?) ?? '',
+        isCorrect: json['is_correct'] as bool,
+        selectedLabels: [
+          for (final label in (json['selected_labels'] as List? ?? const []))
+            '$label',
+        ],
+        correctLabels: [
+          for (final label in (json['correct_labels'] as List? ?? const []))
+            '$label',
+        ],
+      );
+
+  final int questionId;
+  final String? code;
+  final String prompt;
+  final bool isCorrect;
+  final List<String> selectedLabels;
+  final List<String> correctLabels;
+}
+
+/// Row of `GET /training-attempts/review`: one student's attempt.
+class AttemptReview {
+  const AttemptReview({
+    required this.id,
+    required this.courseId,
+    required this.courseTitle,
+    required this.lessonId,
+    required this.lessonTitle,
+    required this.lessonSortOrder,
+    required this.attemptNumber,
+    required this.createdAt,
+    required this.scorePercent,
+    required this.requiredApprovalPercent,
+    required this.approved,
+    required this.answers,
+  });
+
+  factory AttemptReview.fromJson(Map<String, dynamic> json) => AttemptReview(
+    id: json['id'] as int,
+    courseId: json['course_id'] as int,
+    courseTitle: (json['course_title'] as String?) ?? '',
+    lessonId: json['lesson_id'] as int,
+    lessonTitle: (json['lesson_title'] as String?) ?? '',
+    lessonSortOrder: (json['lesson_sort_order'] as int?) ?? 0,
+    attemptNumber: (json['attempt_number'] as int?) ?? 1,
+    createdAt: DateTime.tryParse('${json['created_at']}'),
+    scorePercent: (json['score_percent'] as num).toDouble(),
+    requiredApprovalPercent: json['required_approval_percent'] as int,
+    approved: json['approved'] as bool,
+    answers: [
+      for (final answer in (json['answers'] as List? ?? const []))
+        AnswerReviewRow.fromJson(answer as Map<String, dynamic>),
+    ],
+  );
+
+  final int id;
+  final int courseId;
+  final String courseTitle;
+  final int lessonId;
+  final String lessonTitle;
+  final int lessonSortOrder;
+
+  /// 1 for the first try at this lesson.
+  final int attemptNumber;
+  final DateTime? createdAt;
+  final double scorePercent;
+  final int requiredApprovalPercent;
+  final bool approved;
+  final List<AnswerReviewRow> answers;
+
+  int get correctAnswers => answers.where((answer) => answer.isCorrect).length;
+}
+
+/// Row of `GET /training-attempts/missed-questions`.
+class MissedQuestionRow {
+  const MissedQuestionRow({
+    required this.questionId,
+    required this.code,
+    required this.prompt,
+    required this.courseTitle,
+    required this.lessonTitle,
+    required this.timesAnswered,
+    required this.timesFailed,
+    required this.failPercent,
+  });
+
+  factory MissedQuestionRow.fromJson(Map<String, dynamic> json) =>
+      MissedQuestionRow(
+        questionId: json['question_id'] as int,
+        code: normalizeQuestionCode(json['code'] as String?),
+        prompt: (json['prompt'] as String?) ?? '',
+        courseTitle: (json['course_title'] as String?) ?? '',
+        lessonTitle: (json['lesson_title'] as String?) ?? '',
+        timesAnswered: (json['times_answered'] as int?) ?? 0,
+        timesFailed: (json['times_failed'] as int?) ?? 0,
+        failPercent: ((json['fail_percent'] as num?) ?? 0).toDouble(),
+      );
+
+  final int questionId;
+  final String? code;
+  final String prompt;
+  final String courseTitle;
+  final String lessonTitle;
+  final int timesAnswered;
+  final int timesFailed;
+  final double failPercent;
+}

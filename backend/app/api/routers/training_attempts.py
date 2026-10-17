@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import has_permission, require_permission
 from app.api.routers.courses import ensure_student_can_access_lesson, practice_size
-from app.core.permissions import Permission
+from app.core.permissions import Permission, Role
 from app.db.session import get_db
 from app.models.course import CourseLesson, TrainingQuestion
 from app.models.training_attempt import (
@@ -20,11 +20,18 @@ from app.models.training_attempt import (
 )
 from app.schemas.course import PracticeSessionRead, PracticeStart, StudentQuestionOptionRead, StudentQuestionRead
 from app.models.user import User
-from app.schemas.training_attempt import TrainingAttemptCreate, TrainingAttemptRead
+from app.schemas.training_attempt import (
+    AnswerReviewRead,
+    AttemptReviewRead,
+    MissedQuestionRow,
+    TrainingAttemptCreate,
+    TrainingAttemptRead,
+)
 
 router = APIRouter(prefix="/training-attempts", tags=["training-attempts"])
 
 CourseStudent = Annotated[User, Depends(require_permission(Permission.COURSES_TAKE))]
+ProgressViewer = Annotated[User, Depends(require_permission(Permission.COURSES_PROGRESS_VIEW))]
 ProgressReader = Annotated[
     User, Depends(require_permission(Permission.COURSES_PROGRESS_VIEW, Permission.COURSES_TAKE))
 ]
@@ -212,6 +219,125 @@ def list_training_attempts(
         query = query.where(TrainingAttempt.lesson_id == lesson_id)
 
     return list(db.scalars(query.order_by(TrainingAttempt.id)))
+
+
+def _labels(options) -> list[str]:
+    return [option.label for option in sorted(options, key=lambda option: option.sort_order)]
+
+
+@router.get("/review", response_model=list[AttemptReviewRead])
+def review_student_attempts(
+    employee_reference: str,
+    course_id: int | None = None,
+    *,
+    _: ProgressViewer,
+    db: Session = Depends(get_db),
+) -> list[AttemptReviewRead]:
+    """One student's attempts, newest first, with what was answered and what was right."""
+    query = (
+        select(TrainingAttempt)
+        .join(TrainingAttempt.lesson)
+        .options(
+            selectinload(TrainingAttempt.lesson).selectinload(CourseLesson.course),
+            selectinload(TrainingAttempt.answers)
+            .selectinload(TrainingAnswer.selected_options)
+            .selectinload(TrainingAnswerOption.option),
+            selectinload(TrainingAttempt.answers)
+            .selectinload(TrainingAnswer.question)
+            .selectinload(TrainingQuestion.options),
+        )
+        .where(TrainingAttempt.employee_reference == employee_reference)
+        .order_by(TrainingAttempt.created_at, TrainingAttempt.id)
+    )
+    if course_id is not None:
+        query = query.where(CourseLesson.course_id == course_id)
+
+    tries_per_lesson: dict[int, int] = {}
+    reviews: list[AttemptReviewRead] = []
+    for attempt in db.scalars(query):
+        tries_per_lesson[attempt.lesson_id] = tries_per_lesson.get(attempt.lesson_id, 0) + 1
+        lesson = attempt.lesson
+        reviews.append(
+            AttemptReviewRead(
+                id=attempt.id,
+                employee_reference=attempt.employee_reference,
+                course_id=lesson.course.id,
+                course_title=lesson.course.title,
+                lesson_id=lesson.id,
+                lesson_title=lesson.title,
+                lesson_sort_order=lesson.sort_order,
+                attempt_number=tries_per_lesson[attempt.lesson_id],
+                created_at=attempt.created_at,
+                score_percent=attempt.score_percent,
+                required_approval_percent=attempt.required_approval_percent,
+                approved=attempt.approved,
+                answers=[
+                    AnswerReviewRead(
+                        question_id=answer.question_id,
+                        code=answer.question.code,
+                        prompt=answer.question.prompt,
+                        is_correct=answer.is_correct,
+                        selected_labels=_labels(selected.option for selected in answer.selected_options),
+                        correct_labels=_labels(option for option in answer.question.options if option.is_correct),
+                    )
+                    for answer in attempt.answers
+                ],
+            )
+        )
+    return list(reversed(reviews))
+
+
+@router.get("/missed-questions", response_model=list[MissedQuestionRow])
+def missed_questions(
+    course_id: int | None = None,
+    store_code: str | None = None,
+    *,
+    _: ProgressViewer,
+    db: Session = Depends(get_db),
+) -> list[MissedQuestionRow]:
+    """Questions students fail the most (staff test attempts are left out)."""
+    query = (
+        select(TrainingAnswer.question_id, TrainingAnswer.is_correct)
+        .join(TrainingAttempt, TrainingAnswer.attempt_id == TrainingAttempt.id)
+        .join(User, User.username == TrainingAttempt.employee_reference)
+        .join(CourseLesson, CourseLesson.id == TrainingAttempt.lesson_id)
+        .where(User.role == Role.ALUMNO)
+    )
+    if course_id is not None:
+        query = query.where(CourseLesson.course_id == course_id)
+    if store_code is not None:
+        query = query.where(User.store_code == store_code)
+
+    answered: dict[int, int] = {}
+    failed: dict[int, int] = {}
+    for question_id, is_correct in db.execute(query):
+        answered[question_id] = answered.get(question_id, 0) + 1
+        if not is_correct:
+            failed[question_id] = failed.get(question_id, 0) + 1
+    if not answered:
+        return []
+
+    questions = db.scalars(
+        select(TrainingQuestion)
+        .options(selectinload(TrainingQuestion.lesson).selectinload(CourseLesson.course))
+        .where(TrainingQuestion.id.in_(answered))
+    )
+    rows = [
+        MissedQuestionRow(
+            question_id=question.id,
+            code=question.code,
+            prompt=question.prompt,
+            course_id=question.lesson.course.id,
+            course_title=question.lesson.course.title,
+            lesson_id=question.lesson.id,
+            lesson_title=question.lesson.title,
+            times_answered=answered[question.id],
+            times_failed=failed.get(question.id, 0),
+            fail_percent=failed.get(question.id, 0) / answered[question.id] * 100,
+        )
+        for question in questions
+    ]
+    return sorted(rows, key=lambda row: (-row.times_failed, -row.fail_percent, row.code or "", row.question_id))
 
 
 @router.get("/{attempt_id}", response_model=TrainingAttemptRead)
