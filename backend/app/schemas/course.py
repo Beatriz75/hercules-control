@@ -36,8 +36,14 @@ class TrainingQuestionCreate(BaseModel):
     answer_mode: Literal["single", "multiple"] = "single"
     image_url: str | None = None
     video_url: str | None = Field(default=None, max_length=2000)
+    explanation: str | None = Field(default=None, max_length=4000)
     sort_order: int = Field(ge=1)
     options: list[TrainingQuestionOptionCreate] = Field(min_length=2)
+
+    @field_validator("explanation")
+    @classmethod
+    def check_explanation(cls, value: str | None) -> str | None:
+        return (value or "").strip() or None
 
     @field_validator("video_url")
     @classmethod
@@ -153,6 +159,7 @@ class TrainingQuestionRead(BaseModel):
     answer_mode: str
     image_url: str | None
     video_url: str | None
+    explanation: str | None = None
     sort_order: int
     active: bool
     created_at: datetime
@@ -315,6 +322,7 @@ class QuestionBankRow(BaseModel):
     answer_mode: str
     image_url: str | None
     video_url: str | None
+    explanation: str | None = None
     sort_order: int
     options: list[TrainingQuestionOptionRead]
     lesson_id: int

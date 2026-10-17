@@ -44,7 +44,12 @@ def _get_lesson_or_404(db: Session, lesson_id: int) -> CourseLesson:
 def _get_attempt_or_404(db: Session, attempt_id: int) -> TrainingAttempt:
     attempt = db.scalar(
         select(TrainingAttempt)
-        .options(selectinload(TrainingAttempt.answers).selectinload(TrainingAnswer.selected_options))
+        .options(
+            selectinload(TrainingAttempt.answers).selectinload(TrainingAnswer.selected_options),
+            selectinload(TrainingAttempt.answers)
+            .selectinload(TrainingAnswer.question)
+            .selectinload(TrainingQuestion.options),
+        )
         .where(TrainingAttempt.id == attempt_id)
     )
     if attempt is None:
@@ -196,7 +201,10 @@ def list_training_attempts(
     if not has_permission(user, Permission.COURSES_PROGRESS_VIEW):
         employee_reference = user.username
     query = select(TrainingAttempt).options(
-        selectinload(TrainingAttempt.answers).selectinload(TrainingAnswer.selected_options)
+        selectinload(TrainingAttempt.answers).selectinload(TrainingAnswer.selected_options),
+        selectinload(TrainingAttempt.answers)
+        .selectinload(TrainingAnswer.question)
+        .selectinload(TrainingQuestion.options)
     )
     if employee_reference is not None:
         query = query.where(TrainingAttempt.employee_reference == employee_reference)

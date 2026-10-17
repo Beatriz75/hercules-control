@@ -23,6 +23,7 @@ def _create_course(client: TestClient, required_approval_percent: int = 80, stud
                     "questions": [
                         {
                             "prompt": "Single choice question",
+                            "explanation": "  Because the first option is the rule.  ",
                             "sort_order": 1,
                             "options": [
                                 {"label": "Correct", "is_correct": True, "sort_order": 1},
@@ -221,3 +222,53 @@ def test_list_lesson_progress_filters_by_course(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert [row["lesson_id"] for row in body] == [lesson_id]
+
+
+def test_result_shows_correct_options_and_explanation_after_submitting(client: TestClient) -> None:
+    course = _create_course(client)
+    lesson_id = course["lessons"][0]["id"]
+    single_question_id, multiple_question_id = _question_ids(course)
+    single_options = _option_ids(course, 0)
+    multiple_options = _option_ids(course, 1)
+    # Stored trimmed; questions without one return None.
+    assert course["lessons"][0]["questions"][0]["explanation"] == "Because the first option is the rule."
+    assert course["lessons"][0]["questions"][1]["explanation"] is None
+
+    response = post_attempt(
+        client,
+        {
+            "lesson_id": lesson_id,
+            "answers": [
+                {"question_id": single_question_id, "selected_option_ids": [single_options[1]]},
+                {"question_id": multiple_question_id, "selected_option_ids": [multiple_options[0]]},
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+    single, multiple = response.json()["answers"]
+    assert single["is_correct"] is False
+    assert single["correct_option_ids"] == [single_options[0]]
+    assert single["explanation"] == "Because the first option is the rule."
+    assert multiple["correct_option_ids"] == [multiple_options[0], multiple_options[1]]
+    assert multiple["explanation"] is None
+
+    # The student's own attempt history keeps showing it.
+    history = client.get("/training-attempts").json()
+    assert history[0]["answers"][0]["explanation"] == "Because the first option is the rule."
+
+
+def test_explanation_and_correct_answers_are_hidden_before_submitting(client: TestClient) -> None:
+    course = _create_course(client)
+    lesson_id = course["lessons"][0]["id"]
+
+    started = client.post("/training-attempts/start", json={"lesson_id": lesson_id})
+    assert started.status_code == 201
+    assigned = client.get("/courses/assigned").json()
+
+    for payload in (started.json(), assigned):
+        text = str(payload)
+        assert "explanation" not in text
+        assert "is_correct" not in text
+        assert "correct_option_ids" not in text
+

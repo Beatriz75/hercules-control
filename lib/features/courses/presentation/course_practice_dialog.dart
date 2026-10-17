@@ -459,6 +459,13 @@ class _PracticeDialogState extends State<_PracticeDialog> {
               for (final optionIndex in _answers[question.$1] ?? const <int>[])
                 question.$2.options[optionIndex].label,
             ];
+            final review = result.reviewByQuestionId[question.$2.id];
+            final rightAnswers = [
+              for (final option in question.$2.options)
+                if (review?.correctOptionIds.contains(option.id) ?? false)
+                  option.label,
+            ];
+            final explanation = review?.explanation;
 
             return Container(
               width: double.infinity,
@@ -493,6 +500,42 @@ class _PracticeDialogState extends State<_PracticeDialog> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (!correct && rightAnswers.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            rightAnswers.length == 1
+                                ? 'Respuesta correcta: ${rightAnswers.single}'
+                                : 'Respuestas correctas: ${rightAnswers.join(', ')}',
+                            style: const TextStyle(
+                              color: BrandColors.success,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                        if (!correct && explanation != null) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.lightbulb_outline_rounded,
+                                  size: 18,
+                                  color: colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text('Por qué: $explanation')),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
