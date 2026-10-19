@@ -485,6 +485,10 @@ class _CourseTemplateEditorDialogState
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final bankSize = _selectedLesson.questions.length;
+    final compact = context.isCompact;
+    const intro = Text(
+      'Los cambios se guardan en el servidor al tocar "Guardar curso". Las secciones y preguntas existentes se actualizan sin perder el avance de los alumnos.',
+    );
 
     return MediaUploaderScope(
       uploader: widget.uploadMedia,
@@ -493,549 +497,519 @@ class _CourseTemplateEditorDialogState
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) _requestClose();
         },
-        child: Dialog(
-          insetPadding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 920,
-              maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _isNew
-                                  ? 'Nuevo curso'
-                                  : 'Editor · Lección ${_selectedLessonIndex + 1}',
-                              style: textTheme.labelLarge,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _isNew
-                                  ? 'Crear plantilla de curso'
-                                  : 'Editar ${_draft.title}',
-                              style: textTheme.headlineSmall,
-                            ),
-                          ],
-                        ),
+        child: ResponsiveDialog(
+          maxWidth: 920,
+          maxHeightFactor: 0.9,
+          child: Padding(
+            padding: EdgeInsets.all(context.dialogPadding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _isNew
+                                ? 'Nuevo curso'
+                                : 'Editor · Lección ${_selectedLessonIndex + 1}',
+                            style: textTheme.labelLarge,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _isNew
+                                ? 'Crear plantilla de curso'
+                                : 'Editar ${_draft.title}',
+                            style: textTheme.headlineSmall,
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        onPressed: _saving ? null : _requestClose,
-                        icon: const Icon(Icons.close_rounded),
-                        tooltip: 'Cerrar',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Los cambios se guardan en el servidor al tocar "Guardar curso". Las secciones y preguntas existentes se actualizan sin perder el avance de los alumnos.',
-                  ),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: Form(
-                      key: _formKey,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.only(bottom: 112),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _EditorFieldLabel('Título del curso/módulo'),
-                            const SizedBox(height: 6),
-                            TextFormField(
-                              initialValue: _draft.title,
-                              decoration: _fieldDecoration(),
-                              validator: (value) =>
-                                  _requiredText(value, max: 120),
-                              onChanged: (value) =>
-                                  _replaceCourse(_draft.copyWith(title: value)),
+                    ),
+                    IconButton(
+                      onPressed: _saving ? null : _requestClose,
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: 'Cerrar',
+                    ),
+                  ],
+                ),
+                // Phones: the note scrolls with the form to leave room for it.
+                if (!compact) ...[const SizedBox(height: 8), intro],
+                SizedBox(height: compact ? 8 : 20),
+                Expanded(
+                  child: Form(
+                    key: _formKey,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 112),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (compact) ...[intro, const SizedBox(height: 16)],
+                          const _EditorFieldLabel('Título del curso/módulo'),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            initialValue: _draft.title,
+                            decoration: _fieldDecoration(),
+                            validator: (value) =>
+                                _requiredText(value, max: 120),
+                            onChanged: (value) =>
+                                _replaceCourse(_draft.copyWith(title: value)),
+                          ),
+                          const SizedBox(height: 12),
+                          const _EditorFieldLabel('Descripción'),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            initialValue: _draft.description ?? '',
+                            decoration: _fieldDecoration(),
+                            minLines: 1,
+                            maxLines: 3,
+                            onChanged: (value) => _replaceCourse(
+                              _draft.copyWith(description: value),
                             ),
-                            const SizedBox(height: 12),
-                            const _EditorFieldLabel('Descripción'),
-                            const SizedBox(height: 6),
-                            TextFormField(
-                              initialValue: _draft.description ?? '',
-                              decoration: _fieldDecoration(),
-                              minLines: 1,
-                              maxLines: 3,
-                              onChanged: (value) => _replaceCourse(
-                                _draft.copyWith(description: value),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 24,
-                              runSpacing: 12,
-                              crossAxisAlignment: WrapCrossAlignment.end,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const _EditorFieldLabel(
-                                      'Tiendas asignadas',
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Wrap(
-                                      spacing: 8,
-                                      children: [
-                                        for (final store in storeCodes)
-                                          FilterChip(
-                                            label: Text(store),
-                                            selected: _draft.stores.contains(
-                                              store,
-                                            ),
-                                            onSelected: (selected) =>
-                                                _toggleStore(store, selected),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(
-                                  width: 220,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const _EditorFieldLabel('Estado'),
-                                      const SizedBox(height: 6),
-                                      DropdownButtonFormField<CourseStatus>(
-                                        initialValue: _draft.status,
-                                        decoration: _fieldDecoration(),
-                                        items: [
-                                          for (final status
-                                              in CourseStatus.values)
-                                            DropdownMenuItem(
-                                              value: status,
-                                              child: Text(status.label),
-                                            ),
-                                        ],
-                                        onChanged: (value) {
-                                          if (value != null) {
-                                            _replaceCourse(
-                                              _draft.copyWith(status: value),
-                                            );
-                                          }
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 32),
-                            const _EditorFieldLabel('Sección/lección a editar'),
-                            const SizedBox(height: 6),
-                            DropdownButtonFormField<int>(
-                              key: ValueKey(
-                                'lesson-select-$_selectedLessonIndex-${_draft.lessons.length}',
-                              ),
-                              initialValue: _selectedLessonIndex,
-                              decoration: _fieldDecoration(),
-                              items: [
-                                for (final lesson in _draft.lessons.indexed)
-                                  DropdownMenuItem<int>(
-                                    value: lesson.$1,
-                                    child: Text(
-                                      '${lesson.$1 + 1}. ${lesson.$2.title}',
-                                    ),
-                                  ),
-                              ],
-                              onChanged: (value) {
-                                if (value != null) _selectLesson(value);
-                              },
-                            ),
-                            const SizedBox(height: 10),
-                            const _EditorFieldLabel(
-                              'Buscar preguntas del curso',
-                            ),
-                            const SizedBox(height: 6),
-                            TextField(
-                              decoration: _fieldDecoration().copyWith(
-                                prefixIcon: const Icon(Icons.search_rounded),
-                                hintText:
-                                    'Buscar por texto u opción de respuesta',
-                                suffixIcon: _questionSearchQuery.isEmpty
-                                    ? null
-                                    : IconButton(
-                                        onPressed: () => setState(
-                                          () => _questionSearchQuery = '',
-                                        ),
-                                        icon: const Icon(Icons.close_rounded),
-                                        tooltip: 'Limpiar búsqueda',
-                                      ),
-                              ),
-                              onChanged: (value) =>
-                                  setState(() => _questionSearchQuery = value),
-                            ),
-                            if (_questionSearchQuery.trim().isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              _QuestionSearchResults(
-                                matches: _questionSearchMatches,
-                                lessons: _draft.lessons,
-                                onSelected: _selectLesson,
-                              ),
-                            ],
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                OutlinedButton.icon(
-                                  onPressed: _addLesson,
-                                  icon: const Icon(Icons.add_rounded),
-                                  label: const Text('Agregar sección'),
-                                ),
-                                IconButton.outlined(
-                                  onPressed: _selectedLessonIndex > 0
-                                      ? () => _moveSelectedLesson(-1)
-                                      : null,
-                                  icon: const Icon(Icons.arrow_upward_rounded),
-                                  tooltip: 'Subir sección',
-                                ),
-                                IconButton.outlined(
-                                  onPressed:
-                                      _selectedLessonIndex <
-                                          _draft.lessons.length - 1
-                                      ? () => _moveSelectedLesson(1)
-                                      : null,
-                                  icon: const Icon(
-                                    Icons.arrow_downward_rounded,
-                                  ),
-                                  tooltip: 'Bajar sección',
-                                ),
-                                IconButton.outlined(
-                                  onPressed: _draft.lessons.length > 1
-                                      ? _removeSelectedLesson
-                                      : null,
-                                  icon: const Icon(
-                                    Icons.delete_outline_rounded,
-                                  ),
-                                  tooltip: 'Eliminar sección',
-                                ),
-                              ],
-                            ),
-                            KeyedSubtree(
-                              key: ValueKey(
-                                'lesson-editor-$_selectedLessonIndex-${_selectedLesson.id}-${_draft.lessons.length}',
-                              ),
-                              child: Column(
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 24,
+                            runSpacing: 12,
+                            crossAxisAlignment: WrapCrossAlignment.end,
+                            children: [
+                              Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const SizedBox(height: 16),
-                                  const _EditorFieldLabel(
-                                    'Título de la sección/lección',
-                                  ),
+                                  const _EditorFieldLabel('Tiendas asignadas'),
                                   const SizedBox(height: 6),
-                                  TextFormField(
-                                    initialValue: _selectedLesson.title,
-                                    decoration: _fieldDecoration(),
-                                    validator: (value) =>
-                                        _requiredText(value, max: 160),
-                                    onChanged: (value) =>
-                                        _replaceSelectedLesson(
-                                          _selectedLesson.copyWith(
-                                            title: value,
-                                          ),
-                                        ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  const _EditorFieldLabel('Resultado/resumen'),
-                                  const SizedBox(height: 6),
-                                  TextFormField(
-                                    initialValue: _selectedLesson.summary,
-                                    decoration: _fieldDecoration(),
-                                    validator: _requiredText,
-                                    minLines: 2,
-                                    maxLines: 4,
-                                    onChanged: (value) =>
-                                        _replaceSelectedLesson(
-                                          _selectedLesson.copyWith(
-                                            summary: value,
-                                          ),
-                                        ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  const _EditorFieldLabel('Texto de teoría'),
-                                  const SizedBox(height: 6),
-                                  TextFormField(
-                                    initialValue: _selectedLesson.theory,
-                                    decoration: _fieldDecoration(),
-                                    validator: _requiredText,
-                                    minLines: 4,
-                                    maxLines: 8,
-                                    onChanged: (value) =>
-                                        _replaceSelectedLesson(
-                                          _selectedLesson.copyWith(
-                                            theory: value,
-                                          ),
-                                        ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  const _EditorFieldLabel(
-                                    'Imágenes de teoría por URL',
-                                  ),
-                                  const SizedBox(height: 6),
-                                  TextField(
-                                    controller: _theoryImagesController,
-                                    decoration: _fieldDecoration().copyWith(
-                                      hintText:
-                                          'Pega una URL o data URL por línea. Se muestran debajo del contenido teórico.',
-                                    ),
-                                    minLines: 2,
-                                    maxLines: 5,
-                                    onChanged: (value) =>
-                                        _replaceTheoryImageUrls(
-                                          _theoryImageUrlsFromText(value),
-                                        ),
-                                  ),
-                                  const SizedBox(height: 8),
                                   Wrap(
                                     spacing: 8,
-                                    runSpacing: 8,
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
                                     children: [
-                                      OutlinedButton.icon(
-                                        onPressed: _isPastingTheoryImage
-                                            ? null
-                                            : _pasteTheoryImageFromClipboard,
-                                        icon: Icon(
-                                          _isPastingTheoryImage
-                                              ? Icons.hourglass_top_rounded
-                                              : Icons.content_paste_rounded,
-                                        ),
-                                        label: Text(
-                                          _isPastingTheoryImage
-                                              ? 'Pegando imagen...'
-                                              : 'Pegar imagen capturada',
-                                        ),
-                                      ),
-                                      MediaUploadButton(
-                                        kind: MediaKind.image,
-                                        onUploaded: (url) {
-                                          _replaceTheoryImageUrls([
-                                            ..._selectedLesson.theoryImageUrls,
-                                            url,
-                                          ]);
-                                          _syncTheoryImagesController();
-                                        },
-                                      ),
-                                      const Text(
-                                        'La captura se guarda dentro del curso como data URL.',
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _TheoryVideosEditor(
-                                    key: ValueKey(
-                                      'theory-videos-$_selectedLessonIndex',
-                                    ),
-                                    videos: _selectedLesson.theoryVideos,
-                                    onChanged: (videos) =>
-                                        _replaceSelectedLesson(
-                                          _selectedLesson.copyWith(
-                                            theoryVideos: videos,
+                                      for (final store in storeCodes)
+                                        FilterChip(
+                                          label: Text(store),
+                                          selected: _draft.stores.contains(
+                                            store,
                                           ),
+                                          onSelected: (selected) =>
+                                              _toggleStore(store, selected),
                                         ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Wrap(
-                                    spacing: 16,
-                                    runSpacing: 12,
-                                    children: [
-                                      SizedBox(
-                                        width: 220,
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const _EditorFieldLabel(
-                                              '% de aprobación',
-                                            ),
-                                            const SizedBox(height: 6),
-                                            TextFormField(
-                                              initialValue:
-                                                  '${_selectedLesson.requiredApprovalPercent}',
-                                              decoration: _fieldDecoration()
-                                                  .copyWith(suffixText: '%'),
-                                              keyboardType:
-                                                  TextInputType.number,
-                                              inputFormatters: [
-                                                FilteringTextInputFormatter
-                                                    .digitsOnly,
-                                              ],
-                                              validator: _approvalPercentError,
-                                              onChanged: (value) =>
-                                                  _replaceSelectedLesson(
-                                                    _selectedLesson.copyWith(
-                                                      requiredApprovalPercent:
-                                                          int.tryParse(value) ??
-                                                          0,
-                                                    ),
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 320,
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const _EditorFieldLabel(
-                                              'Preguntas por práctica',
-                                            ),
-                                            const SizedBox(height: 6),
-                                            TextFormField(
-                                              key: ValueKey(
-                                                'per-attempt-$_selectedLessonIndex-$bankSize',
-                                              ),
-                                              initialValue:
-                                                  _selectedLesson
-                                                      .questionsPerAttempt
-                                                      ?.toString() ??
-                                                  '',
-                                              decoration: _fieldDecoration()
-                                                  .copyWith(
-                                                    hintText: 'Vacío = todas',
-                                                    helperText:
-                                                        'Banco: $bankSize preguntas. Cada práctica toma ${_selectedLesson.practiceSize} al azar.',
-                                                    helperMaxLines: 2,
-                                                    errorMaxLines: 2,
-                                                  ),
-                                              keyboardType:
-                                                  TextInputType.number,
-                                              inputFormatters: [
-                                                FilteringTextInputFormatter
-                                                    .digitsOnly,
-                                              ],
-                                              validator: (value) =>
-                                                  _questionsPerAttemptFieldError(
-                                                    value,
-                                                    bankSize,
-                                                  ),
-                                              onChanged: (value) {
-                                                final parsed = int.tryParse(
-                                                  value.trim(),
-                                                );
-                                                _replaceSelectedLesson(
-                                                  parsed == null
-                                                      ? _selectedLesson.copyWith(
-                                                          clearQuestionsPerAttempt:
-                                                              true,
-                                                        )
-                                                      : _selectedLesson.copyWith(
-                                                          questionsPerAttempt:
-                                                              parsed,
-                                                        ),
-                                                );
-                                              },
-                                            ),
-                                          ],
-                                        ),
-                                      ),
                                     ],
-                                  ),
-                                  const SizedBox(height: 20),
-                                  Text(
-                                    'Preguntas de práctica',
-                                    style: textTheme.titleMedium,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  for (final question
-                                      in _selectedLesson.questions.indexed
-                                          .where(
-                                            (entry) => _questionMatchesSearch(
-                                              entry.$2,
-                                            ),
-                                          )) ...[
-                                    KeyedSubtree(
-                                      key: _isHighlighted(question.$2)
-                                          ? _highlightKey
-                                          : null,
-                                      child: _QuestionEditorCard(
-                                        key: ValueKey(
-                                          'question-$_selectedLessonIndex-${question.$1}-${question.$2.id}',
-                                        ),
-                                        highlighted: _isHighlighted(
-                                          question.$2,
-                                        ),
-                                        number: question.$1 + 1,
-                                        question: question.$2,
-                                        lessonIndex: _selectedLessonIndex,
-                                        lessons: _draft.lessons,
-                                        canMoveUp: question.$1 > 0,
-                                        canMoveDown:
-                                            question.$1 <
-                                            _selectedLesson.questions.length -
-                                                1,
-                                        canRemove:
-                                            _selectedLesson.questions.length >
-                                            1,
-                                        canChangeLesson:
-                                            _selectedLesson.questions.length >
-                                            1,
-                                        onChanged: (updatedQuestion) =>
-                                            _replaceQuestion(
-                                              question.$1,
-                                              updatedQuestion,
-                                            ),
-                                        onLessonChanged: (lessonIndex) =>
-                                            _moveQuestionToLesson(
-                                              question.$1,
-                                              lessonIndex,
-                                            ),
-                                        onMoveUp: () =>
-                                            _moveQuestion(question.$1, -1),
-                                        onMoveDown: () =>
-                                            _moveQuestion(question.$1, 1),
-                                        onRemove: () =>
-                                            _removeQuestion(question.$1),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                  ],
-                                  if (_selectedLesson.questions.every(
-                                    (question) =>
-                                        !_questionMatchesSearch(question),
-                                  ))
-                                    const Padding(
-                                      padding: EdgeInsets.only(bottom: 12),
-                                      child: Text(
-                                        'No hay preguntas en esta lección que coincidan con la búsqueda.',
-                                      ),
-                                    ),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: OutlinedButton.icon(
-                                      onPressed: _addQuestion,
-                                      icon: const Icon(Icons.add_rounded),
-                                      label: const Text('Agregar pregunta'),
-                                    ),
                                   ),
                                 ],
                               ),
+                              SizedBox(
+                                width: 220,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const _EditorFieldLabel('Estado'),
+                                    const SizedBox(height: 6),
+                                    DropdownButtonFormField<CourseStatus>(
+                                      isExpanded: true,
+                                      initialValue: _draft.status,
+                                      decoration: _fieldDecoration(),
+                                      items: [
+                                        for (final status
+                                            in CourseStatus.values)
+                                          DropdownMenuItem(
+                                            value: status,
+                                            child: Text(status.label),
+                                          ),
+                                      ],
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          _replaceCourse(
+                                            _draft.copyWith(status: value),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 32),
+                          const _EditorFieldLabel('Sección/lección a editar'),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<int>(
+                            key: ValueKey(
+                              'lesson-select-$_selectedLessonIndex-${_draft.lessons.length}',
+                            ),
+                            initialValue: _selectedLessonIndex,
+                            isExpanded: true,
+                            decoration: _fieldDecoration(),
+                            items: [
+                              for (final lesson in _draft.lessons.indexed)
+                                DropdownMenuItem<int>(
+                                  value: lesson.$1,
+                                  child: Text(
+                                    '${lesson.$1 + 1}. ${lesson.$2.title}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) _selectLesson(value);
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          const _EditorFieldLabel('Buscar preguntas del curso'),
+                          const SizedBox(height: 6),
+                          TextField(
+                            decoration: _fieldDecoration().copyWith(
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              hintText:
+                                  'Buscar por texto u opción de respuesta',
+                              suffixIcon: _questionSearchQuery.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      onPressed: () => setState(
+                                        () => _questionSearchQuery = '',
+                                      ),
+                                      icon: const Icon(Icons.close_rounded),
+                                      tooltip: 'Limpiar búsqueda',
+                                    ),
+                            ),
+                            onChanged: (value) =>
+                                setState(() => _questionSearchQuery = value),
+                          ),
+                          if (_questionSearchQuery.trim().isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            _QuestionSearchResults(
+                              matches: _questionSearchMatches,
+                              lessons: _draft.lessons,
+                              onSelected: _selectLesson,
                             ),
                           ],
-                        ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: _addLesson,
+                                icon: const Icon(Icons.add_rounded),
+                                label: const Text('Agregar sección'),
+                              ),
+                              IconButton.outlined(
+                                onPressed: _selectedLessonIndex > 0
+                                    ? () => _moveSelectedLesson(-1)
+                                    : null,
+                                icon: const Icon(Icons.arrow_upward_rounded),
+                                tooltip: 'Subir sección',
+                              ),
+                              IconButton.outlined(
+                                onPressed:
+                                    _selectedLessonIndex <
+                                        _draft.lessons.length - 1
+                                    ? () => _moveSelectedLesson(1)
+                                    : null,
+                                icon: const Icon(Icons.arrow_downward_rounded),
+                                tooltip: 'Bajar sección',
+                              ),
+                              IconButton.outlined(
+                                onPressed: _draft.lessons.length > 1
+                                    ? _removeSelectedLesson
+                                    : null,
+                                icon: const Icon(Icons.delete_outline_rounded),
+                                tooltip: 'Eliminar sección',
+                              ),
+                            ],
+                          ),
+                          KeyedSubtree(
+                            key: ValueKey(
+                              'lesson-editor-$_selectedLessonIndex-${_selectedLesson.id}-${_draft.lessons.length}',
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 16),
+                                const _EditorFieldLabel(
+                                  'Título de la sección/lección',
+                                ),
+                                const SizedBox(height: 6),
+                                TextFormField(
+                                  initialValue: _selectedLesson.title,
+                                  decoration: _fieldDecoration(),
+                                  validator: (value) =>
+                                      _requiredText(value, max: 160),
+                                  onChanged: (value) => _replaceSelectedLesson(
+                                    _selectedLesson.copyWith(title: value),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const _EditorFieldLabel('Resultado/resumen'),
+                                const SizedBox(height: 6),
+                                TextFormField(
+                                  initialValue: _selectedLesson.summary,
+                                  decoration: _fieldDecoration(),
+                                  validator: _requiredText,
+                                  minLines: 2,
+                                  maxLines: 4,
+                                  onChanged: (value) => _replaceSelectedLesson(
+                                    _selectedLesson.copyWith(summary: value),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const _EditorFieldLabel('Texto de teoría'),
+                                const SizedBox(height: 6),
+                                TextFormField(
+                                  initialValue: _selectedLesson.theory,
+                                  decoration: _fieldDecoration(),
+                                  validator: _requiredText,
+                                  minLines: 4,
+                                  maxLines: 8,
+                                  onChanged: (value) => _replaceSelectedLesson(
+                                    _selectedLesson.copyWith(theory: value),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const _EditorFieldLabel(
+                                  'Imágenes de teoría por URL',
+                                ),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: _theoryImagesController,
+                                  decoration: _fieldDecoration().copyWith(
+                                    hintText:
+                                        'Pega una URL o data URL por línea. Se muestran debajo del contenido teórico.',
+                                  ),
+                                  minLines: 2,
+                                  maxLines: 5,
+                                  onChanged: (value) => _replaceTheoryImageUrls(
+                                    _theoryImageUrlsFromText(value),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: _isPastingTheoryImage
+                                          ? null
+                                          : _pasteTheoryImageFromClipboard,
+                                      icon: Icon(
+                                        _isPastingTheoryImage
+                                            ? Icons.hourglass_top_rounded
+                                            : Icons.content_paste_rounded,
+                                      ),
+                                      label: Text(
+                                        _isPastingTheoryImage
+                                            ? 'Pegando imagen...'
+                                            : 'Pegar imagen capturada',
+                                      ),
+                                    ),
+                                    MediaUploadButton(
+                                      kind: MediaKind.image,
+                                      onUploaded: (url) {
+                                        _replaceTheoryImageUrls([
+                                          ..._selectedLesson.theoryImageUrls,
+                                          url,
+                                        ]);
+                                        _syncTheoryImagesController();
+                                      },
+                                    ),
+                                    const Text(
+                                      'La captura se guarda dentro del curso como data URL.',
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                _TheoryVideosEditor(
+                                  key: ValueKey(
+                                    'theory-videos-$_selectedLessonIndex',
+                                  ),
+                                  videos: _selectedLesson.theoryVideos,
+                                  onChanged: (videos) => _replaceSelectedLesson(
+                                    _selectedLesson.copyWith(
+                                      theoryVideos: videos,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 16,
+                                  runSpacing: 12,
+                                  children: [
+                                    SizedBox(
+                                      width: 220,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const _EditorFieldLabel(
+                                            '% de aprobación',
+                                          ),
+                                          const SizedBox(height: 6),
+                                          TextFormField(
+                                            initialValue:
+                                                '${_selectedLesson.requiredApprovalPercent}',
+                                            decoration: _fieldDecoration()
+                                                .copyWith(suffixText: '%'),
+                                            keyboardType: TextInputType.number,
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter
+                                                  .digitsOnly,
+                                            ],
+                                            validator: _approvalPercentError,
+                                            onChanged: (value) =>
+                                                _replaceSelectedLesson(
+                                                  _selectedLesson.copyWith(
+                                                    requiredApprovalPercent:
+                                                        int.tryParse(value) ??
+                                                        0,
+                                                  ),
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 320,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const _EditorFieldLabel(
+                                            'Preguntas por práctica',
+                                          ),
+                                          const SizedBox(height: 6),
+                                          TextFormField(
+                                            key: ValueKey(
+                                              'per-attempt-$_selectedLessonIndex-$bankSize',
+                                            ),
+                                            initialValue:
+                                                _selectedLesson
+                                                    .questionsPerAttempt
+                                                    ?.toString() ??
+                                                '',
+                                            decoration: _fieldDecoration().copyWith(
+                                              hintText: 'Vacío = todas',
+                                              helperText:
+                                                  'Banco: $bankSize preguntas. Cada práctica toma ${_selectedLesson.practiceSize} al azar.',
+                                              helperMaxLines: 2,
+                                              errorMaxLines: 2,
+                                            ),
+                                            keyboardType: TextInputType.number,
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter
+                                                  .digitsOnly,
+                                            ],
+                                            validator: (value) =>
+                                                _questionsPerAttemptFieldError(
+                                                  value,
+                                                  bankSize,
+                                                ),
+                                            onChanged: (value) {
+                                              final parsed = int.tryParse(
+                                                value.trim(),
+                                              );
+                                              _replaceSelectedLesson(
+                                                parsed == null
+                                                    ? _selectedLesson.copyWith(
+                                                        clearQuestionsPerAttempt:
+                                                            true,
+                                                      )
+                                                    : _selectedLesson.copyWith(
+                                                        questionsPerAttempt:
+                                                            parsed,
+                                                      ),
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  'Preguntas de práctica',
+                                  style: textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 12),
+                                for (final question
+                                    in _selectedLesson.questions.indexed.where(
+                                      (entry) =>
+                                          _questionMatchesSearch(entry.$2),
+                                    )) ...[
+                                  KeyedSubtree(
+                                    key: _isHighlighted(question.$2)
+                                        ? _highlightKey
+                                        : null,
+                                    child: _QuestionEditorCard(
+                                      key: ValueKey(
+                                        'question-$_selectedLessonIndex-${question.$1}-${question.$2.id}',
+                                      ),
+                                      highlighted: _isHighlighted(question.$2),
+                                      number: question.$1 + 1,
+                                      question: question.$2,
+                                      lessonIndex: _selectedLessonIndex,
+                                      lessons: _draft.lessons,
+                                      canMoveUp: question.$1 > 0,
+                                      canMoveDown:
+                                          question.$1 <
+                                          _selectedLesson.questions.length - 1,
+                                      canRemove:
+                                          _selectedLesson.questions.length > 1,
+                                      canChangeLesson:
+                                          _selectedLesson.questions.length > 1,
+                                      onChanged: (updatedQuestion) =>
+                                          _replaceQuestion(
+                                            question.$1,
+                                            updatedQuestion,
+                                          ),
+                                      onLessonChanged: (lessonIndex) =>
+                                          _moveQuestionToLesson(
+                                            question.$1,
+                                            lessonIndex,
+                                          ),
+                                      onMoveUp: () =>
+                                          _moveQuestion(question.$1, -1),
+                                      onMoveDown: () =>
+                                          _moveQuestion(question.$1, 1),
+                                      onRemove: () =>
+                                          _removeQuestion(question.$1),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
+                                if (_selectedLesson.questions.every(
+                                  (question) =>
+                                      !_questionMatchesSearch(question),
+                                ))
+                                  const Padding(
+                                    padding: EdgeInsets.only(bottom: 12),
+                                    child: Text(
+                                      'No hay preguntas en esta lección que coincidan con la búsqueda.',
+                                    ),
+                                  ),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _addQuestion,
+                                    icon: const Icon(Icons.add_rounded),
+                                    label: const Text('Agregar pregunta'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  DecoratedBox(
+                ),
+                // Full-width action bar on phones.
+                SizedBox(
+                  width: compact ? double.infinity : null,
+                  child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest,
                       border: Border(
@@ -1093,8 +1067,8 @@ class _CourseTemplateEditorDialogState
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -1393,12 +1367,16 @@ class _QuestionEditorCard extends StatelessWidget {
             const SizedBox(height: 6),
             DropdownButtonFormField<int>(
               initialValue: lessonIndex,
+              isExpanded: true,
               decoration: fieldDecoration(),
               items: [
                 for (final lesson in lessons.indexed)
                   DropdownMenuItem<int>(
                     value: lesson.$1,
-                    child: Text('${lesson.$1 + 1}. ${lesson.$2.title}'),
+                    child: Text(
+                      '${lesson.$1 + 1}. ${lesson.$2.title}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
               ],
               onChanged: canChangeLesson
@@ -1447,6 +1425,7 @@ class _QuestionEditorCard extends StatelessWidget {
           const _EditorFieldLabel('Contenido visual de la pregunta'),
           const SizedBox(height: 6),
           DropdownButtonFormField<QuestionType>(
+            isExpanded: true,
             initialValue: question.type,
             decoration: fieldDecoration(),
             items: const [
@@ -1566,6 +1545,7 @@ class _QuestionEditorCard extends StatelessWidget {
           const _EditorFieldLabel('Tipo de respuesta'),
           const SizedBox(height: 6),
           DropdownButtonFormField<AnswerMode>(
+            isExpanded: true,
             initialValue: question.answerMode,
             decoration: fieldDecoration(),
             items: const [
@@ -1625,48 +1605,67 @@ class _QuestionEditorCard extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _EditorFieldLabel(
+                              // Label on the left, correct-answer actions on
+                              // the right; they wrap under it when narrow.
+                              SizedBox(
+                                width: double.infinity,
+                                child: Wrap(
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    _EditorFieldLabel(
                                       'Opción ${option.$1 + 1}',
                                     ),
-                                  ),
-                                  if (option.$2.isCorrect) ...[
-                                    const _OptionTruthPill(correct: true),
-                                    if (question.answerMode ==
-                                        AnswerMode.multiple)
-                                      TextButton.icon(
-                                        onPressed: correctIndexes.length > 1
-                                            ? () =>
-                                                  _toggleMultipleCorrectOption(
-                                                    option.$1,
-                                                  )
-                                            : null,
-                                        icon: const Icon(
-                                          Icons.remove_circle_outline_rounded,
-                                          size: 16,
-                                        ),
-                                        label: const Text('Quitar correcta'),
-                                      ),
-                                  ] else
-                                    TextButton.icon(
-                                      onPressed:
-                                          question.answerMode ==
-                                              AnswerMode.multiple
-                                          ? () => _toggleMultipleCorrectOption(
-                                              option.$1,
-                                            )
-                                          : () => _setSingleCorrectOption(
-                                              option.$1,
+                                    Wrap(
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      children: [
+                                        if (option.$2.isCorrect) ...[
+                                          const _OptionTruthPill(correct: true),
+                                          if (question.answerMode ==
+                                              AnswerMode.multiple)
+                                            TextButton.icon(
+                                              onPressed:
+                                                  correctIndexes.length > 1
+                                                  ? () =>
+                                                        _toggleMultipleCorrectOption(
+                                                          option.$1,
+                                                        )
+                                                  : null,
+                                              icon: const Icon(
+                                                Icons
+                                                    .remove_circle_outline_rounded,
+                                                size: 16,
+                                              ),
+                                              label: const Text(
+                                                'Quitar correcta',
+                                              ),
                                             ),
-                                      icon: const Icon(
-                                        Icons.check_circle_outline_rounded,
-                                        size: 16,
-                                      ),
-                                      label: const Text('Marcar correcta'),
+                                        ] else
+                                          TextButton.icon(
+                                            onPressed:
+                                                question.answerMode ==
+                                                    AnswerMode.multiple
+                                                ? () =>
+                                                      _toggleMultipleCorrectOption(
+                                                        option.$1,
+                                                      )
+                                                : () => _setSingleCorrectOption(
+                                                    option.$1,
+                                                  ),
+                                            icon: const Icon(
+                                              Icons
+                                                  .check_circle_outline_rounded,
+                                              size: 16,
+                                            ),
+                                            label: const Text(
+                                              'Marcar correcta',
+                                            ),
+                                          ),
+                                      ],
                                     ),
-                                ],
+                                  ],
+                                ),
                               ),
                               const SizedBox(height: 6),
                               TextFormField(
@@ -1706,6 +1705,26 @@ class _QuestionEditorCard extends StatelessWidget {
           ),
           const Text(
             'En respuesta simple, sólo una opción queda como Correcta. En selección múltiple, puedes marcar varias opciones correctas.',
+          ),
+          const SizedBox(height: 12),
+          const _EditorFieldLabel('Explicación de la respuesta (opcional)'),
+          const SizedBox(height: 6),
+          TextFormField(
+            key: ValueKey('practice-explanation-$lessonIndex-$number'),
+            initialValue: question.explanation ?? '',
+            minLines: 2,
+            maxLines: 5,
+            maxLength: 4000,
+            decoration: fieldDecoration().copyWith(
+              hintText:
+                  'Por qué la respuesta correcta es la correcta. El cobrador la ve al terminar la práctica.',
+              prefixIcon: const Icon(Icons.lightbulb_outline_rounded),
+            ),
+            onChanged: (value) => onChanged(
+              value.trim().isEmpty
+                  ? question.copyWith(clearExplanation: true)
+                  : question.copyWith(explanation: value),
+            ),
           ),
         ],
       ),
@@ -1824,67 +1843,85 @@ class _TheoryVideosEditorState extends State<_TheoryVideosEditor> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: TextFormField(
-                        initialValue: video.$2.url,
-                        decoration: decoration(
-                          'Enlace del video',
-                          hint: 'YouTube, Google Drive, Vimeo o .mp4 / .webm',
+                Builder(
+                  builder: (context) {
+                    final urlField = TextFormField(
+                      initialValue: video.$2.url,
+                      decoration: decoration(
+                        'Enlace del video',
+                        hint: 'YouTube, Google Drive, Vimeo o .mp4 / .webm',
+                      ),
+                      validator: (value) => (value ?? '').trim().isEmpty
+                          ? 'Pega el enlace del video.'
+                          : validateVideoUrl(value),
+                      onChanged: (value) {
+                        final updated = [...videos];
+                        updated[video.$1] = video.$2.copyWith(url: value);
+                        _update(updated);
+                      },
+                    );
+                    final titleField = TextFormField(
+                      initialValue: video.$2.title ?? '',
+                      decoration: decoration('Título (opcional)'),
+                      validator: validateVideoTitle,
+                      onChanged: (value) {
+                        final updated = [...videos];
+                        updated[video.$1] = TheoryVideo(
+                          url: video.$2.url,
+                          title: value,
+                        );
+                        _update(updated);
+                      },
+                    );
+                    final actions = [
+                      IconButton(
+                        onPressed: video.$1 > 0
+                            ? () => _move(video.$1, -1)
+                            : null,
+                        icon: const Icon(Icons.arrow_upward_rounded),
+                        tooltip: 'Subir video',
+                      ),
+                      IconButton(
+                        onPressed: video.$1 < videos.length - 1
+                            ? () => _move(video.$1, 1)
+                            : null,
+                        icon: const Icon(Icons.arrow_downward_rounded),
+                        tooltip: 'Bajar video',
+                      ),
+                      IconButton(
+                        onPressed: () => _update(
+                          [...videos]..removeAt(video.$1),
+                          structural: true,
                         ),
-                        validator: (value) => (value ?? '').trim().isEmpty
-                            ? 'Pega el enlace del video.'
-                            : validateVideoUrl(value),
-                        onChanged: (value) {
-                          final updated = [...videos];
-                          updated[video.$1] = video.$2.copyWith(url: value);
-                          _update(updated);
-                        },
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        tooltip: 'Quitar video',
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: TextFormField(
-                        initialValue: video.$2.title ?? '',
-                        decoration: decoration('Título (opcional)'),
-                        validator: validateVideoTitle,
-                        onChanged: (value) {
-                          final updated = [...videos];
-                          updated[video.$1] = TheoryVideo(
-                            url: video.$2.url,
-                            title: value,
-                          );
-                          _update(updated);
-                        },
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: video.$1 > 0
-                          ? () => _move(video.$1, -1)
-                          : null,
-                      icon: const Icon(Icons.arrow_upward_rounded),
-                      tooltip: 'Subir video',
-                    ),
-                    IconButton(
-                      onPressed: video.$1 < videos.length - 1
-                          ? () => _move(video.$1, 1)
-                          : null,
-                      icon: const Icon(Icons.arrow_downward_rounded),
-                      tooltip: 'Bajar video',
-                    ),
-                    IconButton(
-                      onPressed: () => _update(
-                        [...videos]..removeAt(video.$1),
-                        structural: true,
-                      ),
-                      icon: const Icon(Icons.delete_outline_rounded),
-                      tooltip: 'Quitar video',
-                    ),
-                  ],
+                    ];
+                    // Phones: fields stacked, actions under them.
+                    if (context.isCompact) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          urlField,
+                          const SizedBox(height: 8),
+                          titleField,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: actions,
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 3, child: urlField),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 2, child: titleField),
+                        ...actions,
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 MediaUploadButton(

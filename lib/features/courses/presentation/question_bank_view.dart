@@ -331,38 +331,27 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
     final courses = {for (final row in visible) row.courseId}.length;
     final lessons = {for (final row in visible) row.lessonId}.length;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth < 720 ? 1 : 3;
-        return GridView.count(
-          crossAxisCount: crossAxisCount,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: crossAxisCount == 1 ? 3.6 : 2.65,
-          children: [
-            MetricCard(
-              title: 'Preguntas',
-              value: '${visible.length}',
-              caption: 'Con los filtros aplicados',
-              icon: Icons.quiz_rounded,
-            ),
-            MetricCard(
-              title: 'Cursos',
-              value: '$courses',
-              caption: 'Con preguntas en el resultado',
-              icon: Icons.school_rounded,
-            ),
-            MetricCard(
-              title: 'Lecciones',
-              value: '$lessons',
-              caption: 'Con preguntas en el resultado',
-              icon: Icons.menu_book_rounded,
-            ),
-          ],
-        );
-      },
+    return MetricCardGrid(
+      cards: [
+        MetricCard(
+          title: 'Preguntas',
+          value: '${visible.length}',
+          caption: 'Con los filtros aplicados',
+          icon: Icons.quiz_rounded,
+        ),
+        MetricCard(
+          title: 'Cursos',
+          value: '$courses',
+          caption: 'Con preguntas en el resultado',
+          icon: Icons.school_rounded,
+        ),
+        MetricCard(
+          title: 'Lecciones',
+          value: '$lessons',
+          caption: 'Con preguntas en el resultado',
+          icon: Icons.menu_book_rounded,
+        ),
+      ],
     );
   }
 
@@ -383,6 +372,9 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
         if (row.courseId == _filter.courseId)
           row.lessonId: 'Lección ${row.lessonSortOrder}: ${row.lessonTitle}',
     };
+
+    // Phones: every filter takes the full width, one per line.
+    final compact = context.isCompact;
 
     return AppPanel(
       child: Column(
@@ -430,7 +422,7 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               SizedBox(
-                width: 260,
+                width: compact ? double.infinity : 260,
                 child: DropdownButtonFormField<int?>(
                   key: ValueKey('course-${_filter.store}-${_filter.courseId}'),
                   initialValue: courses.containsKey(_filter.courseId)
@@ -465,7 +457,7 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
                 ),
               ),
               SizedBox(
-                width: 280,
+                width: compact ? double.infinity : 280,
                 child: DropdownButtonFormField<int?>(
                   key: ValueKey(
                     'lesson-${_filter.courseId}-${_filter.lessonId}',
@@ -503,7 +495,7 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
                 ),
               ),
               SizedBox(
-                width: 210,
+                width: compact ? double.infinity : 210,
                 child: DropdownButtonFormField<AnswerMode?>(
                   initialValue: _filter.answerMode,
                   isExpanded: true,
@@ -534,7 +526,7 @@ class _QuestionBankViewState extends State<_QuestionBankView> {
                 ),
               ),
               SizedBox(
-                width: 320,
+                width: compact ? double.infinity : 320,
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
@@ -635,6 +627,21 @@ class _BankQuestionCardState extends State<_BankQuestionCard> {
     final colorScheme = Theme.of(context).colorScheme;
     final question = row.question;
     final imageUrl = question.imageUrl ?? '';
+    final compact = context.isCompact;
+    final actions = [
+      if (onOpenCourse != null)
+        TextButton.icon(
+          onPressed: onOpenCourse,
+          icon: const Icon(Icons.school_outlined, size: 18),
+          label: const Text('Ir al curso'),
+        ),
+      if (onEdit != null)
+        OutlinedButton.icon(
+          onPressed: onEdit,
+          icon: const Icon(Icons.edit_rounded, size: 18),
+          label: const Text('Editar'),
+        ),
+    ];
 
     return Container(
       width: double.infinity,
@@ -696,20 +703,15 @@ class _BankQuestionCardState extends State<_BankQuestionCard> {
                   ],
                 ),
               ),
-              if (onOpenCourse != null)
-                TextButton.icon(
-                  onPressed: onOpenCourse,
-                  icon: const Icon(Icons.school_outlined, size: 18),
-                  label: const Text('Ir al curso'),
-                ),
-              if (onEdit != null)
-                OutlinedButton.icon(
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_rounded, size: 18),
-                  label: const Text('Editar'),
-                ),
+              if (!compact) ...actions,
             ],
           ),
+          // Phones: the actions go under the question, aligned right.
+          if (compact && actions.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(spacing: 8, children: actions),
+            ),
           if (imageUrl.isNotEmpty) ...[
             const SizedBox(height: 10),
             ConstrainedBox(
@@ -1109,7 +1111,7 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
       runSpacing: 12,
       children: [
         SizedBox(
-          width: 340,
+          width: context.isCompact ? double.infinity : 340,
           child: DropdownButtonFormField<int>(
             initialValue: _courseId,
             isExpanded: true,
@@ -1132,7 +1134,7 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
           ),
         ),
         SizedBox(
-          width: 360,
+          width: context.isCompact ? double.infinity : 360,
           child: DropdownButtonFormField<int>(
             key: ValueKey('bank-lesson-$_courseId'),
             initialValue: _lessonId,
@@ -1169,123 +1171,114 @@ class _BankQuestionEditDialogState extends State<_BankQuestionEditDialog> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _requestClose();
       },
-      child: Dialog(
-        insetPadding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: 820,
-            maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            row == null
-                                ? 'Banco de preguntas'
-                                : '${row.courseTitle} · Lección ${row.lessonSortOrder}: ${row.lessonTitle}',
-                            style: Theme.of(context).textTheme.labelLarge,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            row == null ? 'Nueva pregunta' : 'Editar pregunta',
-                            style: Theme.of(context).textTheme.headlineSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _saving ? null : _requestClose,
-                      icon: const Icon(Icons.close_rounded),
-                      tooltip: 'Cerrar',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Flexible(
-                  child: Form(
-                    key: _formKey,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (widget.isCreate) ...[
-                            _lessonPickers(),
-                            const SizedBox(height: 16),
-                          ],
-                          KeyedSubtree(
-                            key: ValueKey('bank-question-$_generation'),
-                            child: _QuestionEditorCard.standalone(
-                              question: _draft,
-                              onChanged: _onDraftChanged,
-                              belowPrompt: _similarPanel(),
-                            ),
-                          ),
-                        ],
-                      ),
+      child: ResponsiveDialog(
+        maxWidth: 820,
+        maxHeightFactor: 0.9,
+        child: Padding(
+          padding: EdgeInsets.all(context.dialogPadding),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          row == null
+                              ? 'Banco de preguntas'
+                              : '${row.courseTitle} · Lección ${row.lessonSortOrder}: ${row.lessonTitle}',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          row == null ? 'Nueva pregunta' : 'Editar pregunta',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 120),
-                    child: SingleChildScrollView(
-                      child: Text(
-                        _error!,
-                        style: TextStyle(
-                          color: colorScheme.error,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
+                  IconButton(
+                    onPressed: _saving ? null : _requestClose,
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Cerrar',
                   ),
                 ],
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save_rounded),
-                      label: Text(
-                        _saving ? 'Guardando...' : 'Guardar pregunta',
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (widget.isCreate) ...[
+                          _lessonPickers(),
+                          const SizedBox(height: 16),
+                        ],
+                        KeyedSubtree(
+                          key: ValueKey('bank-question-$_generation'),
+                          child: _QuestionEditorCard.standalone(
+                            question: _draft,
+                            onChanged: _onDraftChanged,
+                            belowPrompt: _similarPanel(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      _error!,
+                      style: TextStyle(
+                        color: colorScheme.error,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (widget.isCreate)
-                      OutlinedButton.icon(
-                        onPressed: _saving
-                            ? null
-                            : () => _save(addAnother: true),
-                        icon: const Icon(Icons.playlist_add_rounded),
-                        label: const Text('Guardar y agregar otra'),
-                      ),
-                    OutlinedButton.icon(
-                      onPressed: _saving ? null : _requestClose,
-                      icon: const Icon(Icons.close_rounded),
-                      label: const Text('Cancelar'),
-                    ),
-                  ],
+                  ),
                 ),
               ],
-            ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_rounded),
+                    label: Text(_saving ? 'Guardando...' : 'Guardar pregunta'),
+                  ),
+                  if (widget.isCreate)
+                    OutlinedButton.icon(
+                      onPressed: _saving ? null : () => _save(addAnother: true),
+                      icon: const Icon(Icons.playlist_add_rounded),
+                      label: const Text('Guardar y agregar otra'),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: _saving ? null : _requestClose,
+                    icon: const Icon(Icons.close_rounded),
+                    label: const Text('Cancelar'),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),

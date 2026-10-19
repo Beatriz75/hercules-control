@@ -122,6 +122,8 @@ class TrainingQuestion(Base):
     answer_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="single")
     image_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
     video_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    # Why the right answer is right; shown to the student only after submitting a practice.
+    explanation: Mapped[str | None] = mapped_column(Text(), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean(), nullable=False, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

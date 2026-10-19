@@ -175,6 +175,9 @@ class _VideoPausedPlaceholder extends StatelessWidget {
 class _VideoLinkCard extends StatelessWidget {
   const _VideoLinkCard({required this.url});
 
+  /// Below this width the "Abrir video" button goes under the link.
+  static const double _stackLinkBelow = 420;
+
   final String url;
 
   @override
@@ -189,17 +192,21 @@ class _VideoLinkCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.play_circle_fill_rounded,
-            color: colorScheme.primary,
-            size: 36,
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: SelectableText(url, maxLines: 2)),
-          const SizedBox(width: 8),
-          TextButton.icon(
+      // Narrow screens: the button goes under the link so it stays readable.
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final link = Row(
+            children: [
+              Icon(
+                Icons.play_circle_fill_rounded,
+                color: colorScheme.primary,
+                size: 36,
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: SelectableText(url, maxLines: 2)),
+            ],
+          );
+          final open = TextButton.icon(
             onPressed: () {
               if (!openExternalUrl(url)) {
                 ScaffoldMessenger.maybeOf(context)?.showSnackBar(
@@ -211,8 +218,25 @@ class _VideoLinkCard extends StatelessWidget {
             },
             icon: const Icon(Icons.open_in_new_rounded, size: 18),
             label: const Text('Abrir video'),
-          ),
-        ],
+          );
+
+          if (constraints.maxWidth < _stackLinkBelow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                link,
+                Align(alignment: Alignment.centerRight, child: open),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: link),
+              const SizedBox(width: 8),
+              open,
+            ],
+          );
+        },
       ),
     );
   }

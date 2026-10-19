@@ -246,47 +246,44 @@ class _PracticeDialogState extends State<_PracticeDialog> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _close();
       },
-      child: Dialog(
-        insetPadding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Práctica', style: textTheme.labelLarge),
-                            const SizedBox(height: 6),
-                            Text(lesson.title, style: textTheme.headlineSmall),
-                          ],
-                        ),
+      child: ResponsiveDialog(
+        maxWidth: 960,
+        child: Padding(
+          padding: EdgeInsets.all(context.dialogPadding),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Práctica', style: textTheme.labelLarge),
+                          const SizedBox(height: 6),
+                          Text(lesson.title, style: textTheme.headlineSmall),
+                        ],
                       ),
-                      IconButton(
-                        onPressed: _submitting ? null : _close,
-                        icon: const Icon(Icons.close_rounded),
-                        tooltip: 'Cerrar',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    result == null
-                        ? '${_practiceDescription(lesson)}. Responde una pregunta a la vez; al terminar se envían todas tus respuestas y el sistema calcula la nota.'
-                        : 'Resultado de tu intento.',
-                  ),
-                  const SizedBox(height: 20),
-                  ...body,
-                ],
-              ),
+                    ),
+                    IconButton(
+                      onPressed: _submitting ? null : _close,
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: 'Cerrar',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  result == null
+                      ? '${_practiceDescription(lesson)}. Responde una pregunta a la vez; al terminar se envían todas tus respuestas y el sistema calcula la nota.'
+                      : 'Resultado de tu intento.',
+                ),
+                const SizedBox(height: 20),
+                ...body,
+              ],
             ),
           ),
         ),
@@ -462,6 +459,13 @@ class _PracticeDialogState extends State<_PracticeDialog> {
               for (final optionIndex in _answers[question.$1] ?? const <int>[])
                 question.$2.options[optionIndex].label,
             ];
+            final review = result.reviewByQuestionId[question.$2.id];
+            final rightAnswers = [
+              for (final option in question.$2.options)
+                if (review?.correctOptionIds.contains(option.id) ?? false)
+                  option.label,
+            ];
+            final explanation = review?.explanation;
 
             return Container(
               width: double.infinity,
@@ -496,6 +500,42 @@ class _PracticeDialogState extends State<_PracticeDialog> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (!correct && rightAnswers.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            rightAnswers.length == 1
+                                ? 'Respuesta correcta: ${rightAnswers.single}'
+                                : 'Respuestas correctas: ${rightAnswers.join(', ')}',
+                            style: const TextStyle(
+                              color: BrandColors.success,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                        if (!correct && explanation != null) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.lightbulb_outline_rounded,
+                                  size: 18,
+                                  color: colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text('Por qué: $explanation')),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

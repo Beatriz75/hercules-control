@@ -77,6 +77,11 @@ class _StudentCoursesViewState extends State<_StudentCoursesView> {
     return completedTasks / (course.lessons.length * 2);
   }
 
+  int _approvedLessons(Course course) => [
+    for (var index = 0; index < course.lessons.length; index++)
+      _lessonProgress(course, index),
+  ].where((progress) => progress.practiceApproved).length;
+
   String _courseStatus(Course course) {
     final progress = _courseProgress(course);
     if (progress == 1) return 'Completado';
@@ -173,39 +178,27 @@ class _StudentCoursesViewState extends State<_StudentCoursesView> {
                         'Capacitación operativa con teoría, práctica por lección y avance progresivo.',
                   ),
                   const SizedBox(height: 20),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final crossAxisCount = constraints.maxWidth < 720 ? 1 : 3;
-
-                      return GridView.count(
-                        crossAxisCount: crossAxisCount,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: crossAxisCount == 1 ? 3.6 : 2.65,
-                        children: [
-                          MetricCard(
-                            title: 'Cursos asignados',
-                            value: '${courses.length}',
-                            caption: 'Tienda ${widget.storeCode ?? '—'}',
-                            icon: Icons.school_rounded,
-                          ),
-                          MetricCard(
-                            title: 'Lecciones',
-                            value: '$lessonCount',
-                            caption: 'En tu ruta de capacitación',
-                            icon: Icons.menu_book_rounded,
-                          ),
-                          MetricCard(
-                            title: 'Completados',
-                            value: '$completedCourses',
-                            caption: 'Cursos con todas las lecciones',
-                            icon: Icons.verified_rounded,
-                          ),
-                        ],
-                      );
-                    },
+                  MetricCardGrid(
+                    cards: [
+                      MetricCard(
+                        title: 'Cursos asignados',
+                        value: '${courses.length}',
+                        caption: 'Tienda ${widget.storeCode ?? '—'}',
+                        icon: Icons.school_rounded,
+                      ),
+                      MetricCard(
+                        title: 'Lecciones',
+                        value: '$lessonCount',
+                        caption: 'En tu ruta de capacitación',
+                        icon: Icons.menu_book_rounded,
+                      ),
+                      MetricCard(
+                        title: 'Completados',
+                        value: '$completedCourses',
+                        caption: 'Cursos con todas las lecciones',
+                        icon: Icons.verified_rounded,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
                   AppPanel(
@@ -227,6 +220,7 @@ class _StudentCoursesViewState extends State<_StudentCoursesView> {
                             statusLabels: [
                               _courseStatus(course.$2),
                               '${(_courseProgress(course.$2) * 100).round()}%',
+                              '${_approvedLessons(course.$2)}/${course.$2.lessons.length} prácticas aprobadas',
                             ],
                             selected: course.$1 == _selectedCourseIndex,
                             onTap: () => setState(
@@ -501,85 +495,78 @@ class _LessonTheoryDialogState extends State<_LessonTheoryDialog> {
   Widget build(BuildContext context) {
     final lesson = widget.lesson;
 
-    return Dialog(
-      insetPadding: const EdgeInsets.all(24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _DialogTitle(
-                  overline:
-                      '${widget.course.title} · Lección ${widget.lessonNumber}',
-                  title: lesson.title,
-                ),
-                const SizedBox(height: 16),
-                Text(lesson.summary),
-                const SizedBox(height: 20),
-                const _TheoryBlock(
-                  title: 'Objetivo',
-                  body:
-                      'Entender el criterio operativo de la lección antes de avanzar a la práctica.',
-                ),
+    return ResponsiveDialog(
+      maxWidth: 720,
+      child: Padding(
+        padding: EdgeInsets.all(context.dialogPadding),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DialogTitle(
+                overline:
+                    '${widget.course.title} · Lección ${widget.lessonNumber}',
+                title: lesson.title,
+              ),
+              const SizedBox(height: 16),
+              Text(lesson.summary),
+              const SizedBox(height: 20),
+              const _TheoryBlock(
+                title: 'Objetivo',
+                body:
+                    'Entender el criterio operativo de la lección antes de avanzar a la práctica.',
+              ),
+              const SizedBox(height: 12),
+              _TheoryBlock(title: 'Contenido', body: lesson.theory),
+              if (lesson.theoryVideos.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                _TheoryBlock(title: 'Contenido', body: lesson.theory),
-                if (lesson.theoryVideos.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _TheoryVideosBlock(videos: lesson.theoryVideos),
-                ],
-                if (lesson.theoryImageUrls.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _TheoryImagesBlock(imageUrls: lesson.theoryImageUrls),
-                ],
-                const SizedBox(height: 12),
-                _TheoryBlock(
-                  title: 'Regla de avance',
-                  body:
-                      'Cuando marques esta teoría como leída, la práctica queda disponible. ${_practiceDescription(lesson)}.',
-                ),
-                const SizedBox(height: 24),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    if (!_theoryCompleted)
-                      FilledButton.icon(
-                        onPressed: _saving ? null : _markTheory,
-                        icon: _saving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.check_rounded),
-                        label: const Text('Marcar teoría como leída'),
-                      ),
-                    FilledButton.tonalIcon(
-                      onPressed: _theoryCompleted
-                          ? widget.onStartPractice
-                          : null,
-                      icon: const Icon(Icons.quiz_rounded),
-                      label: Text(
-                        _theoryCompleted
-                            ? 'Iniciar práctica'
-                            : 'Primero marca la teoría como leída',
-                      ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                      label: const Text('Cerrar'),
-                    ),
-                  ],
-                ),
+                _TheoryVideosBlock(videos: lesson.theoryVideos),
               ],
-            ),
+              if (lesson.theoryImageUrls.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _TheoryImagesBlock(imageUrls: lesson.theoryImageUrls),
+              ],
+              const SizedBox(height: 12),
+              _TheoryBlock(
+                title: 'Regla de avance',
+                body:
+                    'Cuando marques esta teoría como leída, la práctica queda disponible. ${_practiceDescription(lesson)}.',
+              ),
+              const SizedBox(height: 24),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  if (!_theoryCompleted)
+                    FilledButton.icon(
+                      onPressed: _saving ? null : _markTheory,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check_rounded),
+                      label: const Text('Marcar teoría como leída'),
+                    ),
+                  FilledButton.tonalIcon(
+                    onPressed: _theoryCompleted ? widget.onStartPractice : null,
+                    icon: const Icon(Icons.quiz_rounded),
+                    label: Text(
+                      _theoryCompleted
+                          ? 'Iniciar práctica'
+                          : 'Primero marca la teoría como leída',
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                    label: const Text('Cerrar'),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),

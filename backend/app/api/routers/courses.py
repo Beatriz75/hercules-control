@@ -77,6 +77,7 @@ def _build_lessons(payload: CourseCreate) -> list[CourseLesson]:
                     answer_mode=question.answer_mode,
                     image_url=question.image_url,
                     video_url=question.video_url,
+                    explanation=question.explanation,
                     sort_order=question.sort_order,
                     active=True,
                     options=[
@@ -236,6 +237,7 @@ def _new_question(payload: TrainingQuestionCreate) -> TrainingQuestion:
         answer_mode=payload.answer_mode,
         image_url=payload.image_url,
         video_url=payload.video_url,
+        explanation=payload.explanation,
         sort_order=payload.sort_order,
         active=True,
         options=[
@@ -272,6 +274,7 @@ def _apply_question(
     question.answer_mode = payload.answer_mode
     question.image_url = payload.image_url
     question.video_url = payload.video_url
+    question.explanation = payload.explanation
     question.active = True
     for option_id in removed_ids:
         question.options.remove(existing_options[option_id])

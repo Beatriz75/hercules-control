@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hercules_control/core/api/api_client.dart';
 import 'package:hercules_control/core/auth/auth_scope.dart';
+import 'package:hercules_control/core/layout/breakpoints.dart';
 import 'package:hercules_control/core/theme/app_theme.dart';
 import 'package:hercules_control/core/widgets/brand_logo.dart';
 
@@ -56,17 +57,19 @@ class _LoginPageState extends State<LoginPage> {
     final textTheme = Theme.of(context).textTheme;
     final sessionMessage = AuthScope.of(context).sessionMessage;
     final message = _error ?? sessionMessage;
+    // Phones: smaller margins and logo so the form fits above the keyboard.
+    final compact = context.isCompact;
 
     return Scaffold(
       backgroundColor: BrandColors.navy,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(compact ? 16 : 24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: Card(
               child: Padding(
-                padding: const EdgeInsets.all(28),
+                padding: EdgeInsets.all(compact ? 20 : 28),
                 child: Form(
                   key: _formKey,
                   child: AutofillGroup(
@@ -74,11 +77,11 @@ class _LoginPageState extends State<LoginPage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Center(child: BrandMark(size: 132)),
+                        Center(child: BrandMark(size: compact ? 96 : 132)),
                         const SizedBox(height: 12),
-                        const Center(
+                        Center(
                           child: BrandWordmark(
-                            fontSize: 30,
+                            fontSize: compact ? 26 : 30,
                             alignment: CrossAxisAlignment.center,
                           ),
                         ),

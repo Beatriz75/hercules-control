@@ -87,6 +87,8 @@ http.Response _json(Object body, [int status = 200]) => http.Response(
 
 final _starts = <Map<String, dynamic>>[];
 final _coursePuts = <Map<String, dynamic>>[];
+final _reviewQueries = <Map<String, String>>[];
+final _missedQueries = <Map<String, String>>[];
 final _similarPrompts = <String>[];
 var _similarFails = false;
 final _attempts = <Map<String, dynamic>>[];
@@ -97,6 +99,7 @@ Future<AuthController> _signIn(
   String role,
   List<String> permissions, {
   bool secondTheoryDone = false,
+  double? secondBestScore,
 }) async {
   final client = MockClient((request) async {
     final path = request.url.path;
@@ -118,6 +121,60 @@ Future<AuthController> _signIn(
     if (request.method == 'PUT' && path.endsWith('/courses/1')) {
       _coursePuts.add(jsonDecode(request.body) as Map<String, dynamic>);
       return _json(_course(student: false));
+    }
+    if (path.endsWith('/training-attempts/review')) {
+      _reviewQueries.add(request.url.queryParameters);
+      return _json([
+        {
+          'id': 9,
+          'employee_reference': 'ana',
+          'course_id': 1,
+          'course_title': 'Ruta Mexi',
+          'lesson_id': 10,
+          'lesson_title': 'Lección 10',
+          'lesson_sort_order': 1,
+          'attempt_number': 1,
+          'created_at': '2026-10-12T15:30:00',
+          'score_percent': 50.0,
+          'required_approval_percent': 80,
+          'approved': false,
+          'answers': [
+            {
+              'question_id': 101,
+              'code': 'P12',
+              'prompt': '¿Dónde se valida un SPEI?',
+              'is_correct': false,
+              'selected_labels': ['En OXXO'],
+              'correct_labels': ['En Banxico'],
+            },
+            {
+              'question_id': 102,
+              'code': null,
+              'prompt': '¿Se guarda la cuenta?',
+              'is_correct': true,
+              'selected_labels': ['No'],
+              'correct_labels': ['No'],
+            },
+          ],
+        },
+      ]);
+    }
+    if (path.endsWith('/training-attempts/missed-questions')) {
+      _missedQueries.add(request.url.queryParameters);
+      return _json([
+        {
+          'question_id': 101,
+          'code': 'P12',
+          'prompt': '¿Dónde se valida un SPEI?',
+          'course_id': 1,
+          'course_title': 'Ruta Mexi',
+          'lesson_id': 10,
+          'lesson_title': 'Lección 10',
+          'times_answered': 4,
+          'times_failed': 3,
+          'fail_percent': 75.0,
+        },
+      ]);
     }
     if (path.endsWith('/training-attempts/start')) {
       final body = jsonDecode(request.body) as Map<String, dynamic>;
@@ -160,6 +217,10 @@ Future<AuthController> _signIn(
               'question_id': answer['question_id'],
               'is_correct': _approveAttempts || answer['question_id'] == 113,
               'selected_options': [],
+              'correct_option_ids': [(answer['question_id'] as int) * 10 + 1],
+              'explanation': answer['question_id'] == 111
+                  ? 'Explicación 1'
+                  : null,
             },
         ],
       }, 201);
@@ -214,7 +275,7 @@ Future<AuthController> _signIn(
             'lesson_id': 11,
             'theory_completed': true,
             'practice_approved': false,
-            'best_score_percent': null,
+            'best_score_percent': secondBestScore,
             'completed_at': null,
             'updated_at': '2026-10-12T15:30:00',
           },
@@ -257,6 +318,8 @@ void main() {
     _attempts.clear();
     _approveAttempts = true;
     _coursePuts.clear();
+    _reviewQueries.clear();
+    _missedQueries.clear();
     _similarPrompts.clear();
     _similarFails = false;
   });
@@ -279,6 +342,41 @@ void main() {
     );
     expect(find.text('Usuarios'), findsNothing);
     expect(find.text('Editar plantilla'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('alumno sees on each lesson whether the practice was approved', (
+    tester,
+  ) async {
+    final auth = await _signIn(
+      tester,
+      'alumno',
+      ['courses.take'],
+      secondTheoryDone: true,
+      secondBestScore: 50,
+    );
+    await _pumpShell(tester, auth);
+
+    expect(
+      find.text('Práctica aprobada · nota 100% (mínimo 80%)'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Práctica no aprobada · mejor nota 50% (mínimo 80%)'),
+      findsOneWidget,
+    );
+    expect(find.text('Repasa la teoría e inténtalo de nuevo.'), findsOneWidget);
+    expect(find.text('1/2 prácticas aprobadas'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('alumno sees a practice not taken yet', (tester) async {
+    final auth = await _signIn(tester, 'alumno', [
+      'courses.take',
+    ], secondTheoryDone: true);
+    await _pumpShell(tester, auth);
+
+    expect(find.text('Práctica sin hacer (mínimo 80%)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -359,6 +457,10 @@ void main() {
     await _settle(tester);
 
     expect(find.textContaining('No aprobado: 50%'), findsOneWidget);
+    // The wrong answer shows the right one and why; the right one does not.
+    expect(find.text('Respuesta correcta: Correcta 1'), findsOneWidget);
+    expect(find.text('Por qué: Explicación 1'), findsOneWidget);
+    expect(find.textContaining('Respuesta correcta: Correcta 3'), findsNothing);
     await tester.tap(find.text('Intentar de nuevo'));
     await _settle(tester);
 
@@ -473,6 +575,65 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('supervisor sees a student attempts and what was wrong', (
+    tester,
+  ) async {
+    final auth = await _signIn(tester, 'supervisor', [
+      'courses.view',
+      'courses.progress.view',
+    ]);
+    await _pumpShell(tester, auth);
+    await tester.tap(find.text('Avance de alumnos'));
+    await _settle(tester);
+
+    await tester.tap(find.text('Ver intentos'));
+    await _settle(tester);
+    expect(_reviewQueries, [
+      {'employee_reference': 'ana', 'course_id': '1'},
+    ]);
+    expect(find.text('Intentos de Ana'), findsOneWidget);
+    expect(find.text('Lección 1: Lección 10'), findsOneWidget);
+    expect(
+      find.textContaining('No aprobado: 50% (1/2 correctas, mínimo 80%)'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Lección 1: Lección 10'));
+    await _settle(tester);
+    expect(find.text('P12 · ¿Dónde se valida un SPEI?'), findsOneWidget);
+    expect(find.text('Respondió: En OXXO'), findsOneWidget);
+    expect(find.text('Correcta: En Banxico'), findsOneWidget);
+    // Right answers do not repeat the correct option.
+    expect(find.text('Correcta: No'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('supervisor sees the most missed questions by store', (
+    tester,
+  ) async {
+    final auth = await _signIn(tester, 'supervisor', [
+      'courses.view',
+      'courses.progress.view',
+    ]);
+    await _pumpShell(tester, auth);
+    await tester.tap(find.text('Avance de alumnos'));
+    await _settle(tester);
+
+    await tester.tap(find.text('Preguntas más falladas'));
+    await _settle(tester);
+    expect(find.text('75%'), findsOneWidget);
+    expect(find.text('P12 · ¿Dónde se valida un SPEI?'), findsOneWidget);
+    expect(find.text('Falló 3 de 4 · Ruta Mexi · Lección 10'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Mexi'));
+    await _settle(tester);
+    expect(_missedQueries, [
+      <String, String>{},
+      {'store_code': 'Mexi'},
+    ]);
+    expect(tester.takeException(), isNull);
+  });
+
   Future<void> addNewQuestionAndSave(WidgetTester tester) async {
     final auth = await _signIn(tester, 'administrador', [
       'courses.view',
@@ -489,12 +650,13 @@ void main() {
     await tester.tap(add);
     await _settle(tester);
 
-    // Last card: question text, option 1, option 2.
+    // Last card: question text, option 1, option 2, explanation.
     final fields = find.byType(TextFormField);
     final count = tester.widgetList(fields).length;
-    await tester.enterText(fields.at(count - 3), '¿Cómo valido un SPEI?');
-    await tester.enterText(fields.at(count - 2), 'En Banxico');
-    await tester.enterText(fields.at(count - 1), 'No se valida');
+    await tester.enterText(fields.at(count - 4), '¿Cómo valido un SPEI?');
+    await tester.enterText(fields.at(count - 3), 'En Banxico');
+    await tester.enterText(fields.at(count - 2), 'No se valida');
+    await tester.enterText(fields.at(count - 1), 'Se revisa en Banxico.');
     await tester.pump();
     await tester.tap(find.text('Guardar curso'));
     await _settle(tester);
@@ -526,6 +688,14 @@ void main() {
     await tester.tap(find.text('Guardar de todos modos'));
     await _settle(tester);
     expect(_coursePuts, hasLength(1));
+    final savedQuestions = [
+      for (final lesson in _coursePuts.single['lessons'] as List)
+        ...(lesson as Map<String, dynamic>)['questions'] as List,
+    ];
+    final saved = savedQuestions.cast<Map<String, dynamic>>().singleWhere(
+      (question) => question['prompt'] == '¿Cómo valido un SPEI?',
+    );
+    expect(saved['explanation'], 'Se revisa en Banxico.');
     expect(tester.takeException(), isNull);
   });
 

@@ -40,6 +40,8 @@ class TrainingAnswerRead(BaseModel):
     question_id: int
     is_correct: bool
     selected_options: list[TrainingAnswerOptionRead]
+    correct_option_ids: list[int]
+    explanation: str | None
 
 
 class TrainingAttemptRead(BaseModel):
@@ -66,3 +68,47 @@ class LessonProgressRead(BaseModel):
     best_score_percent: float | None
     completed_at: datetime | None
     updated_at: datetime
+
+
+class AnswerReviewRead(BaseModel):
+    """One answered question of an attempt, readable by staff."""
+
+    question_id: int
+    code: str | None
+    prompt: str
+    is_correct: bool
+    selected_labels: list[str]
+    correct_labels: list[str]
+
+
+class AttemptReviewRead(BaseModel):
+    """A student's attempt with lesson context and numbered per lesson (1 = first try)."""
+
+    id: int
+    employee_reference: str
+    course_id: int
+    course_title: str
+    lesson_id: int
+    lesson_title: str
+    lesson_sort_order: int
+    attempt_number: int
+    created_at: datetime
+    score_percent: float
+    required_approval_percent: int
+    approved: bool
+    answers: list[AnswerReviewRead]
+
+
+class MissedQuestionRow(BaseModel):
+    """How often students failed one question (only students' attempts count)."""
+
+    question_id: int
+    code: str | None
+    prompt: str
+    course_id: int
+    course_title: str
+    lesson_id: int
+    lesson_title: str
+    times_answered: int
+    times_failed: int
+    fail_percent: float
