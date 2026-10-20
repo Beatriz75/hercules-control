@@ -33,9 +33,9 @@ docker compose ps         # db, backend y web en "running"; backend y web en "he
 
 ## Manuales de usuario
 
-- [Manual del Administrador](docs/Manual_del_Administrador_Hercules_Control_v1.0.0.docx): alta de cobradores, usuarios, publicar y editar cursos, banco de preguntas y avance.
-- [Manual del Cobrador](docs/Manual_del_Cobrador_Hercules_Control_v1.0.0.docx): primer día, teoría, práctica y qué hacer si algo falla.
-- [Manual general (todos los roles)](docs/Manual_de_usuario_Hercules_Control_v1.0.0.docx).
+- [Manual del Administrador](docs/Manual_del_Administrador_Hercules_Control_v1.1.0.docx): alta de cobradores, usuarios, publicar y editar cursos, banco de preguntas, explicaciones, avance, intentos y preguntas más falladas.
+- [Manual del Cobrador](docs/Manual_del_Cobrador_Hercules_Control_v1.1.0.docx): primer día, teoría, práctica (con respuesta correcta y porqué al fallar), uso en el celular y qué hacer si algo falla.
+- [Manual general (todos los roles)](docs/Manual_de_usuario_Hercules_Control_v1.1.0.docx).
 
 ## Cómo colaboramos
 
