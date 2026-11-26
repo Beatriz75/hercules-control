@@ -1,5 +1,5 @@
 /// Store codes available for courses and students.
-const storeCodes = ['Ofertas', 'Mexi'];
+const storeCodes = ['Ofertas', 'Mexi', 'Santiago'];
 
 /// Fixed roles defined by the backend.
 enum UserRole {
